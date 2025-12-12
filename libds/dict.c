@@ -25,7 +25,7 @@
 #endif
 
 #define MIN_SIZE 1024
-#define RANGE_RESIZE 0.75
+#define RANGE_RESIZE 0.60
 
 // MARK: - HELPER FUNCTIONS
 
@@ -165,7 +165,6 @@ _dict_insert(
     const size_t start_idx = index;
     size_t i = 0;
 
-    __builtin_prefetch(&array->elements[index], 0, 1);
     do {
         // Change to quadratic clusters
         // index = (index + 1) % array->size;
@@ -213,6 +212,54 @@ _dict_insert(
 }
 
 /**
+ * @brief Inserts element in a specific array.
+ * @internal
+ *
+ * Insert directly into first space on array
+ *
+ * @param self The dictionary instance.
+ * @param array The specific array to insert into.
+ * @param element The element structure containing key, data, and state.
+ */
+static inline void
+_dict_insert_blind(
+    Dictionary* self,
+    Array* array,
+    struct DictElement element
+) {
+
+    const size_t hash_value = self->hash(element.key);
+    size_t index = hash_value & (array->size - 1);
+    const size_t start_idx = index;
+    size_t i = 0;
+
+    do {
+        // Change to quadratic clusters
+        // index = (index + 1) % array->size;
+        const size_t next_i = i + 1;
+        size_t next_index;
+        if (i < 32) {
+            next_index = (start_idx + next_i*next_i) & (array->size - 1);
+
+        } else { next_index = (start_idx + next_i) & (array->size - 1); }
+
+        __builtin_prefetch(&array->elements[index], 0, 1);
+
+        struct DictElement* element_array = &array->elements[index];
+
+        if (unlikely(element_array->state == EMPTY)) {
+            array->elements[index] = element;
+            array->elements[index].state = USED;
+            array->num_elements++;
+            return;
+        }
+
+        index = next_index;
+        i++;
+    } while (i < array->size);
+}
+
+/**
  * @brief Finds the raw index of a key in the array.
  * @internal
  *
@@ -235,7 +282,6 @@ _dict_find_index(
     const size_t start_idx = index;
     size_t i = 0;
 
-    __builtin_prefetch(&array->elements[index], 0, 1);
     do {
         // Change to quadratic clusters
         // index = (index + 1) % array->size;
@@ -276,33 +322,25 @@ _dict_find_index(
 static inline void
 dict_rehash_table(Dictionary* self) {
 
-    ssize_t empty_miss  = (ssize_t)(self->array[0].size / 4);
     size_t  moved_count = 0;
-    const size_t max_move_size = self->array[0].size / 6;
 
     __builtin_prefetch(&self->array[0].elements[self->rehash_index], 0, 1);
     while (
         self->rehash_index < self->array[0].size &&
-        empty_miss > 0 &&
-        moved_count < max_move_size
+        moved_count < 100
     ) {
         struct DictElement* element = &self->array[0].elements[self->rehash_index];
 
         if (likely(element->state != USED)) {
             self->rehash_index++;
-            empty_miss--;
             continue;
         }
 
-        const DictResult result = _dict_insert(self, &self->array[1], *element);
-        if (likely(result != DICT_ERR)) {
-            if (result == DICT_ADDED) self->array[1].num_elements++;
+        _dict_insert_blind(self, &self->array[1], *element);
 
-            element->state = DELETED;
-            self->array[0].num_elements--;
-            moved_count++;
-
-        } else { break; }
+        element->state = DELETED;
+        self->array[0].num_elements--;
+        moved_count++;
 
         self->rehash_index++;
     }
@@ -456,7 +494,7 @@ dict_set(
     if (self->is_rehashing) {
         dict_rehash_table(self);
 
-    } else if (self->array[0].num_elements >= (size_t)((double)self->array[0].size * 0.75)) {
+    } else if (self->array[0].num_elements >= (size_t)((double)self->array[0].size * RANGE_RESIZE)) {
         const size_t new_size = self->array[0].size * 2;
 
         self->array[1].elements     = zcalloc(new_size, sizeof(struct DictElement));

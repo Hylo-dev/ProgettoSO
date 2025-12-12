@@ -57,7 +57,7 @@ typedef struct Array {
         any data;       /**< The value stored in the element. */
 
         NodeState state; /**< Metadata regarding the slot's occupancy. */
-    } *elements __attribute__((aligned(64)));
+    } *elements; // Remove force padding because in big data the cache miss is most frequently
 
     size_t size;         /**< Total capacity of the array. */
     size_t num_elements; /**< Current number of occupied elements. */

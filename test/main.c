@@ -4,14 +4,13 @@
 //
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <assert.h>
-#include <stdint.h>
+#include <stdbool.h>
 #include <sys/time.h>
 
-#include "include/dict.h"
+#include "../libds/dict.h"
+
 
 // === CONFIG ===
 #define NUM_ITEMS_SMALL   10000

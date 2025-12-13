@@ -56,8 +56,10 @@ typedef struct Array {
         any key;        /**< The key associated with the element. */
         any data;       /**< The value stored in the element. */
 
-        NodeState state; /**< Metadata regarding the slot's occupancy. */
+        // Remove for implement pointer tagging
+        // NodeState state; /**< Metadata regarding the slot's occupancy. */
     } *elements; // Remove force padding because in big data the cache miss is most frequently
+    // Remove metadata on struct make a struct 16 byte, this is cache friendly
 
     size_t size;         /**< Total capacity of the array. */
     size_t num_elements; /**< Current number of occupied elements. */

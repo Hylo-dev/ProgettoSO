@@ -27,6 +27,19 @@
 #define MIN_SIZE 1024
 #define RANGE_RESIZE 0.60
 
+// 3 bit for EMPTY(0), USED(1), DELETED(2) state
+#define STATE_MASK  0x7ULL          // 00...00111
+#define PTR_MASK    (~STATE_MASK)   // 11...11000
+
+// Get a clean key
+#define GET_KEY(tagged_ptr)  ((void*)((uintptr_t)(tagged_ptr) & PTR_MASK))
+
+// Get state from a pointer
+#define GET_STATE(tagged_ptr) ((NodeState)((uintptr_t)(tagged_ptr) & STATE_MASK))
+
+// Make a pointer "dirty" (Key + State)
+#define TAG_PTR(key, state)  ((void*)((uintptr_t)(key) | (state)))
+
 // MARK: - HELPER FUNCTIONS
 
 /**
@@ -70,12 +83,16 @@ _dict_search(
 
         __builtin_prefetch(&array->elements[index], 0, 1);
 
-        const struct DictElement element = array->elements[index];
+        any raw_tagged = array->elements[index].key;
 
-        if (unlikely(element.state == EMPTY)) return NULL;
+        NodeState state = GET_STATE(raw_tagged);
 
-        if (likely(element.state == USED && self->compare(key, element.key) == 0))
-            return element.data;
+        if (unlikely(state == EMPTY)) return NULL;
+
+        any current_key = GET_KEY(raw_tagged);
+
+        if (likely(state == USED && self->compare(key, current_key) == 0))
+            return array->elements[index].data;
 
         index = next_index;
         i++;
@@ -120,12 +137,16 @@ _dict_change_state(
 
         __builtin_prefetch(&array->elements[index], 0, 1);
 
-        struct DictElement* element = &array->elements[index];
+        any raw_tagged = array->elements[index].key;
+        NodeState state_tagged = GET_STATE(raw_tagged);
 
-        if (unlikely(element->state == EMPTY)) return false;
+        if (unlikely(state_tagged == EMPTY)) return false;
 
-        if (likely(element->state == USED && self->compare(key, element->key) == 0)) {
-            element->state = state;
+        any current_key = GET_KEY(raw_tagged);
+
+        if (likely(state_tagged == USED && self->compare(key, current_key) == 0)) {
+            array->elements[index].key = TAG_PTR(current_key, state);
+            // element->state = state;
             return true;
         }
 
@@ -177,23 +198,31 @@ _dict_insert(
 
         __builtin_prefetch(&array->elements[index], 0, 1);
 
-        struct DictElement* element_array = &array->elements[index];
+        any raw_tagged = array->elements[index].key;
+        NodeState state_tagged = GET_STATE(raw_tagged);
 
-        if (unlikely(element_array->state == EMPTY)) {
+        if (unlikely(state_tagged == EMPTY)) {
             if (best_position == -1) best_position = (ssize_t)index;
 
-            array->elements[best_position] = element;
-            array->elements[best_position].state = USED;
+            array->elements[best_position].key  = TAG_PTR(element.key, USED);
+            array->elements[best_position].data = element.data;
+
+            // array->elements[best_position] = element;
+            // array->elements[best_position].state = USED;
             return DICT_ADDED;
         }
 
-        if (likely(element_array->state == USED && self->compare(element.key, element_array->key) == 0)) {
-            *element_array = element;
-            element_array->state = USED;
+        any current_key = GET_KEY(raw_tagged);
+
+        if (likely(state_tagged == USED && self->compare(element.key, current_key) == 0)) {
+            array->elements[index].key  = TAG_PTR(element.key, USED);
+            array->elements[index].data = element.data;
+
+            // element_array->state = USED;
             return DICT_UPDATED;
         }
 
-        if (element_array->state == DELETED) {
+        if (state_tagged == DELETED) {
             if (best_position == -1) best_position = (ssize_t)index;
         }
 
@@ -203,8 +232,11 @@ _dict_insert(
 
     if (best_position != -1) {
 
-        array->elements[best_position] = element;
-        array->elements[best_position].state = USED;
+        array->elements[best_position].key  = TAG_PTR(element.key, USED);
+        array->elements[best_position].data = element.data;
+
+        // array->elements[best_position] = element;
+        // array->elements[best_position].state = USED;
         return DICT_ADDED;
     }
 
@@ -245,11 +277,16 @@ _dict_insert_blind(
 
         __builtin_prefetch(&array->elements[index], 0, 1);
 
-        struct DictElement* element_array = &array->elements[index];
+        any raw_tagged = array->elements[index].key;
+        NodeState state_tagged = GET_STATE(raw_tagged);
 
-        if (unlikely(element_array->state == EMPTY)) {
-            array->elements[index] = element;
-            array->elements[index].state = USED;
+        if (unlikely(state_tagged == EMPTY)) {
+            array->elements[index].key  = TAG_PTR(element.key, USED);
+            array->elements[index].data = element.data;
+
+            // array->elements[index] = element;
+            // array->elements[index].state = USED;
+
             array->num_elements++;
             return;
         }
@@ -294,11 +331,14 @@ _dict_find_index(
 
         __builtin_prefetch(&array->elements[index], 0, 1);
 
-        const struct DictElement* element = &array->elements[index];
+        any raw_tagged = array->elements[index].key;
+        NodeState state_tagged = GET_STATE(raw_tagged);
 
-        if (unlikely(element->state == EMPTY)) return -1;
+        if (unlikely(state_tagged == EMPTY)) return -1;
 
-        if (likely(element->state == USED && self->compare(key, element->key) == 0)) {
+        any current_key = GET_KEY(raw_tagged);
+
+        if (likely(state_tagged == USED && self->compare(key, current_key) == 0)) {
             return (ssize_t)index;
         }
 
@@ -321,8 +361,7 @@ _dict_find_index(
  */
 static inline void
 dict_rehash_table(Dictionary* self) {
-
-    size_t  moved_count = 0;
+    size_t moved_count = 0;
 
     __builtin_prefetch(&self->array[0].elements[self->rehash_index], 0, 1);
     while (
@@ -330,15 +369,24 @@ dict_rehash_table(Dictionary* self) {
         moved_count < 100
     ) {
         struct DictElement* element = &self->array[0].elements[self->rehash_index];
+        any raw_tagged = element->key;
+        NodeState state_tagged = GET_STATE(raw_tagged);
 
-        if (likely(element->state != USED)) {
+        if (state_tagged != USED) {
             self->rehash_index++;
             continue;
         }
 
-        _dict_insert_blind(self, &self->array[1], *element);
+        any clean_key = GET_KEY(raw_tagged);
 
-        element->state = DELETED;
+        struct DictElement clean_element = {
+            .key = clean_key,
+            .data = element->data
+        };
+
+        _dict_insert_blind(self, &self->array[1], clean_element);
+
+        element->key = TAG_PTR(clean_key, DELETED);
         self->array[0].num_elements--;
         moved_count++;
 
@@ -346,7 +394,6 @@ dict_rehash_table(Dictionary* self) {
     }
 
     if (self->array[0].num_elements == 0) {
-        // end:
         free(self->array[0].elements);
 
         self->array[0] = self->array[1];
@@ -505,7 +552,7 @@ dict_set(
         self->rehash_index = 0;
     }
 
-    const struct DictElement element = { (any)key, (any)value, USED };
+    const struct DictElement element = { (any)key, (any)value };
 
     if (self->is_rehashing && self->array[1].num_elements > 0) {
 
@@ -519,7 +566,9 @@ dict_set(
             if (result == DICT_ADDED && new_idx == -1) self->array[1].num_elements++;
 
             if (old_idx != -1) {
-                self->array[0].elements[old_idx].state = DELETED;
+                self->array[0].elements[old_idx].key = TAG_PTR(self->array[0].elements[old_idx].key, DELETED);
+
+                // self->array[0].elements[old_idx].state = DELETED;
                 self->array[0].num_elements--;
             }
 

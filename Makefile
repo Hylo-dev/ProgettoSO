@@ -16,7 +16,7 @@ TAG_EXEC  = $(C_CYAN)[EXEC ]$(C_RESET)
 TAG_TEST  = $(C_RED)[TEST ]$(C_RESET)
 
 # Compiler settings
-CC = clang
+CC = gcc
 
 # --- Directories Structure ---
 APP_DIR      = src

@@ -1,6 +1,7 @@
-#ifndef TOOLS_H
-#define TOOLS_H
+#ifndef _TOOLS_H
+#define _TOOLS_H
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -9,31 +10,49 @@
 typedef       void* any; 
 
 // const any type
-typedef const void* any_c; 
+typedef const void* let_any; 
 
 #define foreach(DECL, ARRAY_OF_PTRS, COUNT) \
     for (size_t _fe_i = 0; _fe_i < (COUNT); _fe_i++) \
         for (DECL = (ARRAY_OF_PTRS)[_fe_i], * _fe_once = (void*)1; (size_t)_fe_once; _fe_once = (void*)0)
 
 
-static inline any
-xmalloc(size_t size) {
-    any res = malloc(size);
-    if (!res) {
-        fprintf(stderr, "ERROR: malloc failed");
-        exit(1);
-    }
-    return res;
+static inline void
+panic(const char* msg) {
+    fprintf(stderr, "%s", msg);
+    exit(errno);
 }
 
 static inline any
-xrealloc(void* old_ptr, size_t size) {
-    any res = realloc(old_ptr, size);
-    if (!res) {
-        fprintf(stderr, "ERROR: realloc failed");
-        exit(1);
-    }
-    return res;
+zmalloc(size_t size) {
+    any ptr = malloc(size);
+    if (!ptr)   panic("ERROR: Malloc failed\n");
+    return ptr;
+}
+
+static inline any
+zrealloc(
+    any    old_ptr,
+    size_t size
+) {
+    any ptr = realloc(old_ptr, size);
+    if (!ptr) panic("ERROR: Calloc failed\n");
+    return ptr;
+}
+
+static inline any
+zcalloc(
+    size_t new_size,
+    size_t size
+) {
+    any ptr = calloc(new_size, size);
+    if (!ptr) panic("ERROR: Calloc failed\n");
+    return ptr;
+}
+
+static inline any
+shm_alloc(size_t size) {
+    
 }
 
 #endif

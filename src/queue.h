@@ -36,7 +36,7 @@ queue_push(queue self, any elem);
 bool
 queue_pop (queue self, any out_buff);
 
-any_c
+let_any
 queue_peek(queue self);
 
 

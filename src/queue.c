@@ -1,4 +1,4 @@
-#include "../libds/queue.h"
+#include "queue.h"
 #include "tools.h"
 #include <stddef.h>
 #include <string.h>

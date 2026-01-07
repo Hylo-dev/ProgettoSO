@@ -22,4 +22,7 @@
 #define NOF_WK_SEATS_COFFEE 2
 #define NOF_WK_SEATS_CASSA 2
 
+/* ====================== SIM DATA ===================== */
+#define MAX_DISHES 10
+
 #endif

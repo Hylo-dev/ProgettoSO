@@ -2,23 +2,23 @@
 #define OBJECTS_H
 
 #include "const.h"
-#include "../libds/queue.h"
-#include "../libds/dict.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/_types/_pid_t.h>
 
+#define DISH_NAME_MAX_LEN 32
 
 // incorpora sia i tipi di stazioni sia dove puo' trovarsi un utente.
 // nel caso delle stazioni 'TABLE' e' ignorato
 typedef enum: uint8_t {
-    FIRST_COURSE,
-    MAIN_COURSE,
-    COFFEE,
-    CHECKOUT,
-    TABLE
-} location;
+    FIRST_COURSE = 0,
+    MAIN_COURSE  = 1,
+    COFFEE       = 2,
+    CHECKOUT     = 3,
+    TABLE        = 4,
+    EXIT         = 5
+} location_t;
 
-// not final
 typedef struct {
     pid_t  pid;
     bool   active;
@@ -26,34 +26,42 @@ typedef struct {
     size_t pause_time;  // cumulative time spent on pause
 } worker;
 
-// not final
 typedef struct {
-    pid_t    pid;
-    bool     has_ticket;
-    location current_location;
-    size_t   taken_plates[4];
-    bool     served;
+    pid_t      pid;
+    bool       has_ticket;
+    location_t current_location;
+
+    size_t     taken_plates[4];
+    int        plates_count;
+
+    bool       served;
 } client;
 
 typedef struct {
+    size_t id;
+    char   name[DISH_NAME_MAX_LEN];
     size_t price;
     size_t eating_time;
-} menu_entry;
+} dish_t;
 
 typedef struct {
-    location  type;
-    queue     serving;
-    worker*   workers;
+    location_t  type;
     struct {
-        size_t worked_time;
-        size_t wasted_time;
-        size_t served_dishes;
-        size_t left_dishes;
-        size_t earnings; // 0 for all non checkout stations
+        size_t  worked_time;
+        size_t  wasted_time;
+        size_t  served_dishes;
+        size_t  left_dishes;
+        size_t  earnings; // 0 for all non checkout stations
     } stats; // struct for cleaner code
-
-    // TODO: mettere nella memoria contigua che venga condiviso anche la parte di memeria del dict
-    size_t dict_offset;
+    struct {
+        int client_ids[10]; 
+        int head;
+        int tail;
+        int count;
+        int mutex_sem_id; 
+    } client_queue;
+    worker workers[NOF_WORKERS];
+    dish_t menu   [MAX_DISHES];
 } station;
 
 typedef struct {

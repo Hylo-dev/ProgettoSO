@@ -2,8 +2,8 @@
 #define OBJECTS_H
 
 #include "const.h"
-#include "queue.h"
-#include <cstdint>
+#include "../libds/queue.h"
+#include "../libds/dict.h"
 #include <stddef.h>
 #include <sys/_types/_pid_t.h>
 
@@ -35,17 +35,15 @@ typedef struct {
     bool     served;
 } client;
 
+typedef struct {
+    size_t price;
+    size_t eating_time;
+} menu_entry;
 
 typedef struct {
     location  type;
     queue     serving;
     worker*   workers;
-    // TODO: change with an hash map;
-    struct {
-        size_t id; // 0 is NULL in case the user doesen't take the dessert
-        size_t price;
-        size_t eating_time;
-    } *menu;
     struct {
         size_t worked_time;
         size_t wasted_time;
@@ -53,6 +51,9 @@ typedef struct {
         size_t left_dishes;
         size_t earnings; // 0 for all non checkout stations
     } stats; // struct for cleaner code
+
+    // TODO: mettere nella memoria contigua che venga condiviso anche la parte di memeria del dict
+    size_t dict_offset;
 } station;
 
 typedef struct {

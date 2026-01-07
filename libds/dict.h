@@ -99,7 +99,7 @@ typedef struct {
      * @return 0 if equal, non-zero otherwise.
      */
     int (*compare)(let_any a, let_any b);
-} Dictionary;
+} dict_t;
 
 // - MARK: Functions prototypes
 
@@ -113,7 +113,7 @@ typedef struct {
  * @param compare A function pointer used to check equality between two keys.
  * @return A pointer to the newly created `Dictionary`, or NULL on failure.
  */
-Dictionary*
+dict_t*
 init_dict(
     size_t (*hash)   (let_any key),
     int    (*compare)(let_any a, let_any b)
@@ -127,8 +127,8 @@ init_dict(
  * @param self Pointer to the `Dictionary` instance.
  * @return The same pointer passed in `self`.
  */
-Dictionary*
-retain_dict(Dictionary* self);
+dict_t*
+retain_dict(dict_t* self);
 
 /**
  * @brief Releases the dictionary (decrements reference count).
@@ -139,7 +139,7 @@ retain_dict(Dictionary* self);
  * @param self Pointer to the `Dictionary` instance to release.
  */
 void
-release_dict(Dictionary* self);
+release_dict(dict_t* self);
 
 /**
  * @brief Retrieves a value from the dictionary.
@@ -151,7 +151,7 @@ release_dict(Dictionary* self);
  */
 any
 dict_get(
-    Dictionary* self,
+    dict_t* self,
     let_any key
 );
 
@@ -168,7 +168,7 @@ dict_get(
  */
 bool
 dict_set(
-    Dictionary* self,
+    dict_t* self,
     let_any key,
     let_any value
 );
@@ -184,7 +184,7 @@ dict_set(
  */
 bool
 dict_remove(
-    Dictionary* self,
+    dict_t* self,
     let_any key
 );
 

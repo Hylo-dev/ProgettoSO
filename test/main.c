@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <sys/time.h>
 
-#include "../libds/dict.h"
+#include "../src/dict.h"
 
 
 // === CONFIG ===

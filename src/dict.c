@@ -28,8 +28,8 @@
 #define RANGE_RESIZE 0.60
 
 // 3 bit for EMPTY(0), USED(1), DELETED(2) state
-#define STATE_MASK  0x7ULL          // 00...00111
-#define PTR_MASK    (~STATE_MASK)   // 11...11000
+#define STATE_MASK  0x7ULL          /* 00...00111 */
+#define PTR_MASK    (~STATE_MASK)   /* 11...11000 */
 
 // Get a clean key
 #define GET_KEY(tagged_ptr)  ((void*)((uintptr_t)(tagged_ptr) & PTR_MASK))

@@ -1,5 +1,5 @@
 //
-// ULTIMATE DICTIONARY BENCHMARK SUITE - MAXIMUM OVERDRIVE EDITION 🔥
+// ULTIMATE dict_t BENCHMARK SUITE - MAXIMUM OVERDRIVE EDITION 🔥
 // Tests: Performance, Correctness, Edge Cases, Collision Handling, Memory
 //
 
@@ -127,7 +127,7 @@ void print_benchmark(const char* name, size_t ops, double time_us) {
 
 // 1. Basic Functionality
 bool test_basic_operations(void) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
 
     char* k1 = "alpha";
     char* k2 = "beta";
@@ -162,9 +162,9 @@ bool test_basic_operations(void) {
 
 // 2. Reference Counting (ARC)
 bool test_arc(void) {
-    Dictionary* d1 = init_dict(hash_fnv1a, str_compare);
-    Dictionary* d2 = retain_dict(d1);
-    Dictionary* d3 = retain_dict(d1);
+    dict_t* d1 = init_dict(hash_fnv1a, str_compare);
+    dict_t* d2 = retain_dict(d1);
+    dict_t* d3 = retain_dict(d1);
 
     assert(d1 == d2 && d2 == d3);
 
@@ -184,7 +184,7 @@ bool test_arc(void) {
 
 // 3. Rehashing Stress Test
 bool test_rehashing(void) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(NUM_ITEMS_MEDIUM);
 
     // Force multiple rehashes
@@ -210,7 +210,7 @@ bool test_rehashing(void) {
 // 4. Collision Handling
 bool test_collision_handling(void) {
     // Use bad hash to force collisions
-    Dictionary* d = init_dict(hash_bad, str_compare);
+    dict_t* d = init_dict(hash_bad, str_compare);
     TestData* data = create_test_data(1000);
 
     for (size_t i = 0; i < data->count; i++) {
@@ -234,7 +234,7 @@ bool test_collision_handling(void) {
 
 // 5. Delete-Insert Cycle
 bool test_delete_insert_cycle(void) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(10000);
 
     // Insert all
@@ -298,7 +298,7 @@ bool test_delete_insert_cycle(void) {
 
 // 6. Edge Cases
 bool test_edge_cases(void) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
 
     // NULL checks
     assert(dict_get(NULL, "key") == NULL);
@@ -326,7 +326,7 @@ bool test_edge_cases(void) {
 // === BENCHMARK FUNCTIONS ===
 
 void benchmark_insert(size_t count) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(count);
 
     double start = get_time_us();
@@ -342,7 +342,7 @@ void benchmark_insert(size_t count) {
 }
 
 void benchmark_lookup(size_t count) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(count);
 
     // Prepare
@@ -365,7 +365,7 @@ void benchmark_lookup(size_t count) {
 }
 
 void benchmark_delete(size_t count) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(count);
 
     // Prepare
@@ -387,7 +387,7 @@ void benchmark_delete(size_t count) {
 }
 
 void benchmark_mixed_workload(size_t count) {
-    Dictionary* d = init_dict(hash_fnv1a, str_compare);
+    dict_t* d = init_dict(hash_fnv1a, str_compare);
     TestData* data = create_test_data(count);
 
     double start = get_time_us();
@@ -418,7 +418,7 @@ int main(void) {
     printf("\n%s%s", COLOR_BOLD, COLOR_MAGENTA);
     printf("╔══════════════════════════════════════════════════════════════════╗\n");
     printf("║                                                                  ║\n");
-    printf("║     🔥 ULTIMATE DICTIONARY BENCHMARK SUITE 🔥                    ║\n");
+    printf("║     🔥 ULTIMATE dict_t BENCHMARK SUITE 🔥                    ║\n");
     printf("║              Maximum Overdrive Edition                           ║\n");
     printf("║                                                                  ║\n");
     printf("╚══════════════════════════════════════════════════════════════════╝\n");
@@ -455,7 +455,7 @@ int main(void) {
     printf("\n%s%s", COLOR_BOLD, COLOR_GREEN);
     printf("╔══════════════════════════════════════════════════════════════════╗\n");
     printf("║                                                                  ║\n");
-    printf("║              🎉 ALL TESTS PASSED! DICTIONARY IS SOLID 🎉         ║\n");
+    printf("║              🎉 ALL TESTS PASSED! dict_t IS SOLID 🎉         ║\n");
     printf("║                                                                  ║\n");
     printf("╚══════════════════════════════════════════════════════════════════╝\n");
     printf("%s\n", COLOR_RESET);

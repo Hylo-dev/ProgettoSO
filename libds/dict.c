@@ -4,7 +4,7 @@
 
 /**
  * @file dict.c
- * @brief Implementation of the Dictionary using open addressing and incremental rehashing.
+ * @brief Implementation of the dict_t using open addressing and incremental rehashing.
  * @author Eliomar Alejandro Rodriguez Ferrer
  * @date 12/12/25
  *
@@ -51,14 +51,14 @@
  * 2. Linear probing `(+i)` thereafter to ensure all slots are eventually visited.
  * Includes CPU cache prefetching optimization.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param array The specific array bucket to search (primary or old/rehashing).
  * @param key The key to look for.
  * @return The data associated with the key, or NULL if not found.
  */
 static inline any
 _dict_search(
-    Dictionary* self,
+    dict_t* self,
     Array* array,
     let_any key
 ) {
@@ -105,7 +105,7 @@ _dict_search(
  * @brief Changes the state of a node (e.g., to DELETED) in a specific array.
  * @internal
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param array The specific array to modify.
  * @param key The key to locate.
  * @param state The new state to apply (usually DELETED).
@@ -113,7 +113,7 @@ _dict_search(
  */
 static inline bool
 _dict_change_state(
-    Dictionary* self,
+    dict_t* self,
     Array* array,
     let_any key,
     NodeState state
@@ -166,14 +166,14 @@ _dict_change_state(
  * 2. An EMPTY slot (to insert).
  * 3. A DELETED slot (to recycle, if key not found elsewhere).
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param array The specific array to insert into.
  * @param element The element structure containing key, data, and state.
  * @return DICT_ADDED on new insertion, DICT_UPDATED on update, DICT_ERR on failure.
  */
 static inline DictResult
 _dict_insert(
-    Dictionary* self,
+    dict_t* self,
     Array* array,
     struct DictElement element
 ) {
@@ -249,13 +249,13 @@ _dict_insert(
  *
  * Insert directly into first space on array
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param array The specific array to insert into.
  * @param element The element structure containing key, data, and state.
  */
 static inline void
 _dict_insert_blind(
-    Dictionary* self,
+    dict_t* self,
     Array* array,
     struct DictElement element
 ) {
@@ -300,14 +300,14 @@ _dict_insert_blind(
  * @brief Finds the raw index of a key in the array.
  * @internal
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param array The specific array to search.
  * @param key The key to find.
  * @return The index of the key if found, -1 otherwise.
  */
 static inline ssize_t
 _dict_find_index(
-    Dictionary* self,
+    dict_t* self,
     Array* array,
     let_any key
 ) {
@@ -354,13 +354,13 @@ _dict_find_index(
  * @internal
  *
  * Moves a limited number of elements (bucket by bucket) from array[0] (old)
- * to array[1] (new). This prevents locking the dictionary for a long time
+ * to array[1] (new). This prevents locking the dict_t for a long time
  * during resizing.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  */
 static inline void
-dict_rehash_table(Dictionary* self) {
+dict_rehash_table(dict_t* self) {
     size_t moved_count = 0;
 
     __builtin_prefetch(&self->array[0].elements[self->rehash_index], 0, 1);
@@ -407,28 +407,28 @@ dict_rehash_table(Dictionary* self) {
 
 
 
-// MARK: - DICTIONARY FUNCTIONS
+// MARK: - dict_t FUNCTIONS
 
 
 
 
 /**
- * @brief Initializes a new dictionary.
+ * @brief Initializes a new dict_t.
  *
  * Allocates memory for the primary array and sets initial parameters.
  *
  * @param hash Function pointer for key hashing.
  * @param compare Function pointer for key comparison.
- * @return A new Dictionary pointer or NULL on allocation failure.
+ * @return A new dict_t pointer or NULL on allocation failure.
  */
-Dictionary*
+dict_t*
 init_dict(
     size_t (*hash)   (let_any key),
     int    (*compare)(let_any a, let_any b)
 ) {
-    Dictionary *dict = zmalloc(sizeof(*dict));
+    dict_t *dict = zmalloc(sizeof(*dict));
 
-    // Init Arrays on dictionary
+    // Init Arrays on dict_t
     dict->array[0].elements     = zcalloc(MIN_SIZE, sizeof(struct DictElement));
     dict->array[0].size         = MIN_SIZE;
     dict->array[0].num_elements = 0;
@@ -450,13 +450,13 @@ init_dict(
 }
 
 /**
- * @brief Increments the reference count of the dictionary.
+ * @brief Increments the reference count of the dict_t.
  *
- * @param self The dictionary instance.
- * @return The dictionary instance.
+ * @param self The dict_t instance.
+ * @return The dict_t instance.
  */
-Dictionary*
-retain_dict(Dictionary* self) {
+dict_t*
+retain_dict(dict_t* self) {
     if (unlikely(!self)) return NULL;
 
     atomic_fetch_add(&self->ref_count, 1);
@@ -469,10 +469,10 @@ retain_dict(Dictionary* self) {
  *
  * Uses explicit memory ordering to ensure thread safety during destruction.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  */
 void
-release_dict(Dictionary* self) {
+release_dict(dict_t* self) {
     if (unlikely(!self)) return;
 
     const size_t old_ref_count = (size_t)atomic_fetch_sub_explicit(
@@ -492,18 +492,18 @@ release_dict(Dictionary* self) {
 }
 
 /**
- * @brief Retrieves a value from the dictionary.
+ * @brief Retrieves a value from the dict_t.
  *
  * Performs a rehash step if necessary. Checks the secondary array (array[1])
  * if a rehash is in progress, then the primary array.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param key The key to lookup.
  * @return The value associated with the key, or NULL.
  */
 any
 dict_get(
-    Dictionary* self,
+    dict_t* self,
     let_any key
 ) {
     if (unlikely(!self)) return NULL;
@@ -519,20 +519,20 @@ dict_get(
 }
 
 /**
- * @brief Sets a value for a key in the dictionary.
+ * @brief Sets a value for a key in the dict_t.
  *
  * - Triggers a table resize if load factor exceeds threshold (0.75).
  * - Handles insertion into the new array if rehashing is active.
  * - Ensures no duplicates exist in the old array during rehash.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param key The key to set.
  * @param value The value to associate.
  * @return true on success, false on failure.
  */
 bool
 dict_set(
-    Dictionary* self,
+    dict_t* self,
     let_any key,
     let_any value
 ) {
@@ -589,17 +589,17 @@ dict_set(
 }
 
 /**
- * @brief Removes a key from the dictionary.
+ * @brief Removes a key from the dict_t.
  *
  * Marks the node as DELETED. If rehashing is active, checks both arrays.
  *
- * @param self The dictionary instance.
+ * @param self The dict_t instance.
  * @param key The key to remove.
  * @return true if removed, false if not found.
  */
 bool
 dict_remove(
-    Dictionary* self,
+    dict_t* self,
     let_any key
 ) {
     if (unlikely(!self)) return false;

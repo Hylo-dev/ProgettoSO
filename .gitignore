@@ -42,6 +42,7 @@
 *.idb
 *.pdb
 .idea
+bin
 
 # Kernel Module Compile Results
 *.mod*

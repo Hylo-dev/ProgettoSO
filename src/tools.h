@@ -1,6 +1,7 @@
 #ifndef _TOOLS_H
 #define _TOOLS_H
 
+#include <cstdarg>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,8 +19,12 @@ typedef const void* let_any;
 
 
 static inline void
-panic(const char* msg) {
-    fprintf(stderr, "%s", msg);
+panic(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+
     exit(errno);
 }
 
@@ -48,11 +53,6 @@ zcalloc(
     any ptr = calloc(new_size, size);
     if (!ptr) panic("ERROR: Calloc failed\n");
     return ptr;
-}
-
-static inline any
-shm_alloc(size_t size) {
-    
 }
 
 #endif

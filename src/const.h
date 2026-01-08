@@ -1,6 +1,11 @@
 #ifndef __CONST_H
 #define __CONST_H
 
+/* =================== DISH MAX =================== */
+#define MAX_MAIN_COURSES 10
+#define MAX_FIRST_COURSES 10
+#define MAX_SIDE_DISHES 10
+#define MAX_COFFEE_DISHES 10
 
 /* =================== SIM. DURATION =================== */
 #define SIM_DURATION 5 /* days */

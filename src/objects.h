@@ -1,6 +1,8 @@
 #ifndef OBJECTS_H
 #define OBJECTS_H
 
+#include <stdbool.h>
+
 #include "const.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -13,7 +15,7 @@
 typedef enum: uint8_t {
     FIRST_COURSE = 0,
     MAIN_COURSE  = 1,
-    COFFEE       = 2,
+    COFFEE_BAR       = 2,
     CHECKOUT     = 3,
     TABLE        = 4,
     EXIT         = 5
@@ -45,6 +47,18 @@ typedef struct {
 } dish_t;
 
 typedef struct {
+    size_t id;
+    size_t quantity;
+} dish_available_t;
+
+typedef enum {
+    MAIN,
+    FIRST,
+    SIDE,
+    COFFEE
+} dish_type;
+
+typedef struct {
     location_t  type;
     struct {
         size_t  worked_time;
@@ -68,6 +82,26 @@ typedef struct {
     station stations[4];
     client  clients [NOF_USERS];
 } sim_ctx;
+
+typedef struct {
+    dish_available_t main_courses[MAX_MAIN_COURSES];
+    dish_available_t first_courses[MAX_FIRST_COURSES];
+    dish_available_t side_dishes[MAX_SIDE_DISHES];
+    dish_available_t coffee_dishes[MAX_COFFEE_DISHES];
+
+    dish_t main_courses_menu[MAX_MAIN_COURSES];
+    dish_t first_courses_menu[MAX_FIRST_COURSES];
+    dish_t side_dish_menu[MAX_SIDE_DISHES];
+    dish_t coffee_menu[MAX_COFFEE_DISHES];
+
+    size_t main_menu_size;
+    size_t first_menu_size;
+    size_t side_menu_size;
+    size_t coffee_menu_size;
+
+    bool is_sim_running;
+
+} SharedData;
 
 
 

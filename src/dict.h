@@ -19,7 +19,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "tool.h"
+#include "tools.h"
 
 /**
  * @enum NodeState

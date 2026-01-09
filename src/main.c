@@ -4,10 +4,19 @@
 #include <sys/shm.h>
 #include <sys/msg.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "dict.h"
 #include "tools.h"
 #include "menu.h"
+
+#define SHM_RW 0666
+
+void
+sim_day(sim_ctx_t* ctx);
+
+void
+assign_roles(sim_ctx_t* ctx);
 
 int main(void) {
     /*
@@ -54,85 +63,119 @@ int main(void) {
             Tu: Gestisci il movimento del client (decidere dove andare, mettersi in coda queue_push, aspettare).
             Bro: Gestisce il worker (prelevare dalla coda queue_pop, servire, aggiornare statistiche).
     */
+    srand(time(NULL));
 
-    const int shm_id = shmget(IPC_PRIVATE, sizeof(SharedData), IPC_CREAT | 0666);
+    const int shm_id = shmget(IPC_PRIVATE, sizeof(sim_ctx_t), IPC_CREAT | SHM_RW);
     if (shm_id < 0)
-        panic("ERROR: Shared memory allocation is failed");
+        panic("ERROR: Shared memory allocation is failed\n");
 
-    SharedData* data = shmat(shm_id, NULL, 0);
-    if (data == (void*)-1)
-        panic("ERROR: Shared memory `at` is failed");
+    sim_ctx_t* ctx = shmat(shm_id, NULL, 0);
+    if (ctx == (void*)-1)
+        panic("ERROR: Shared memory `at` is failed\n");
 
     // ----------------- STATIONS -----------------
 
-    const int q_main_courses = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-    if (q_main_courses < 0)
-        panic("ERROR: Creation message queue `q_main_courses` is failed");
-
-    const int q_first_courses = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-    if (q_first_courses < 0)
-        panic("ERROR: Creation message queue `q_first_courses` is failed");
-
-    const int q_side_dishes = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-    if (q_side_dishes < 0)
-        panic("ERROR: Creation message queue `q_side_dishes` is failed");
-
-    const int q_coffee_dishes = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-    if (q_coffee_dishes < 0)
-        panic("ERROR: Creation message queue `q_coffee_dishes` is failed");
-
-    // ----------------- CHECKOUT -----------------
-
-    const int q_checkout = msgget(IPC_PRIVATE, IPC_CREAT | 0666);
-    if (q_checkout < 0)
-        panic("ERROR: Creation message queue `q_checkout` is failed");
-
+    for (size_t i = 0; i < NOF_STATIONS; i++) {
+        ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
+    }
 
     // ----------------- CLEAN SHM -----------------
-    memset(data, 0, sizeof(SharedData));
-    data->is_sim_running = true;
-
+    memset(ctx, 0, sizeof(sim_ctx_t));
+    ctx->is_sim_running = true;
 
     // ----------------- GET MENU -----------------
-    load_menu("menu.json", data);
+    load_menu("menu.json", ctx);
 
-    for (size_t i = 0; i < data->main_menu_size; i++) {
-        data->main_courses[i].id = data->main_courses_menu[i].id;
-        data->main_courses[i].quantity = 100;
+    for (size_t i = 0; i < ctx->main_menu_size; i++) {
+        ctx->main_courses[i].id       = ctx->main_courses_menu[i].id;
+        ctx->main_courses[i].quantity = 100;
     }
 
-    for (size_t i = 0; i < data->first_menu_size; i++) {
-        data->first_courses[i].id = data->first_courses_menu[i].id;
-        data->first_courses[i].quantity = 100;
+    for (size_t i = 0; i < ctx->first_menu_size; i++) {
+        ctx->first_courses[i].id       = ctx->first_courses_menu[i].id;
+        ctx->first_courses[i].quantity = 100;
     }
 
-    for (size_t i = 0; i < data->side_menu_size; i++) {
-        data->side_dishes[i].id = data->side_dish_menu[i].id;
-        data->side_dishes[i].quantity = 100;
-    }
-
-    for (size_t i = 0; i < data->coffee_menu_size; i++) {
-        data->coffee_dishes[i].id = data->coffee_menu[i].id;
-        data->coffee_dishes[i].quantity = 100;
+    for (size_t i = 0; i < ctx->coffee_menu_size; i++) {
+        ctx->coffee_dishes[i].id       = ctx->coffee_menu[i].id;
+        ctx->coffee_dishes[i].quantity = 100;
     }
 
     // CREATE WORKERS
     char str_shm_id[16];
     sprintf(str_shm_id, "%d", shm_id);
 
-    char str_q_first[16];
-    sprintf(str_q_first, "%d", q_first_courses);
-
-    for (int i = 0; i < 2; i++) {
+    for (size_t i = 0; i < NOF_WORKERS; i++) {
         const pid_t pid = fork();
-        if (pid < 0) panic("ERROR: Fork worker failed");
+        if (pid < 0) panic("ERROR: Fork worker failed\n");
 
         if (pid == 0) {
-            char *args[] = { "./worker", str_shm_id, str_q_first, "PRIMI", NULL };
+            ctx->roles[i].worker = getpid();
+
+            char *args[] = { "./worker", str_shm_id, NULL };
 
             execve("./worker", args, NULL);
 
-            panic("ERROR: Execve failed for worker");
+            panic("ERROR: Execve failed for worker\n");
         }
     }
+
+    for (size_t i = 0; i < SIM_DURATION; i++) {
+        sim_day(ctx);
+    }
+}
+
+int
+_compare_pair_station(
+    let_any a,
+    let_any b
+) {
+    const struct pair_station* first  = (struct pair_station*)a;
+    const struct pair_station* second = (struct pair_station*)b;
+
+    return (second->avg_time - first->avg_time);
+}
+
+void
+assign_roles(sim_ctx_t* ctx) {
+    location_t roles_buffer[NOF_WORKERS];
+    int assigned_count = 0;
+
+    roles_buffer[assigned_count++] = FIRST_COURSE; // 0
+    roles_buffer[assigned_count++] = MAIN_COURSE;  // 1
+    roles_buffer[assigned_count++] = COFFEE_BAR;   // 2
+    roles_buffer[assigned_count++] = CHECKOUT;     // 3
+
+    struct pair_station priority_list[4] = {
+        { FIRST_COURSE, AVG_SRVC_FIRST_COURSE },
+        { MAIN_COURSE,  AVG_SRVC_MAIN_COURSE  },
+        { COFFEE_BAR,   AVG_SRVC_COFFEE      },
+        { CHECKOUT,     AVG_SRVC_CASSA       }
+    };
+
+    qsort(priority_list, 4, sizeof(struct pair_station), _compare_pair_station);
+
+    int p_index = 0;
+    while (assigned_count < NOF_WORKERS) {
+        roles_buffer[assigned_count++] = priority_list[p_index].id;
+
+        p_index++;
+        if (p_index > 3) p_index = 0;
+    }
+
+    for (int i = NOF_WORKERS - 1; i > 0; i--) {
+        const int j = rand() % (i + 1);
+        const location_t temp = roles_buffer[i];
+        roles_buffer[i] = roles_buffer[j];
+        roles_buffer[j] = temp;
+    }
+
+    for (int i = 0; i < NOF_WORKERS; i++) {
+        ctx->roles[i].role = roles_buffer[i];
+    }
+}
+
+void
+sim_day(sim_ctx_t* ctx) {
+    assign_roles(ctx);
 }

@@ -1,11 +1,13 @@
 #ifndef _TOOLS_H
 #define _TOOLS_H
 
-#include <cstdarg>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <sys/msg.h>
+#include <sys/_types/_key_t.h>
 
 // any type
 typedef       void* any; 
@@ -16,7 +18,6 @@ typedef const void* let_any;
 #define foreach(DECL, ARRAY_OF_PTRS, COUNT) \
     for (size_t _fe_i = 0; _fe_i < (COUNT); _fe_i++) \
         for (DECL = (ARRAY_OF_PTRS)[_fe_i], * _fe_once = (void*)1; (size_t)_fe_once; _fe_once = (void*)0)
-
 
 static inline void
 panic(const char* fmt, ...) {
@@ -54,5 +55,19 @@ zcalloc(
     if (!ptr) panic("ERROR: Calloc failed\n");
     return ptr;
 }
+
+// ====================== SHM WRAPPER ======================
+static inline size_t
+zmsgget(
+    const key_t key,
+    const int   mode
+) {
+    int result = msgget(key, mode);
+    if (result < 0)
+        panic("ERROR: Creation message queue is failed\n");
+
+    return (size_t)result;
+}
+
 
 #endif

@@ -9,7 +9,7 @@
 void
 load_menu(
     const char* filename,
-    SharedData* data
+    sim_ctx_t* data
 );
 
 #endif //PROGETTOSO_MENU_H

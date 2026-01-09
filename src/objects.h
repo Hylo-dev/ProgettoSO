@@ -15,11 +15,16 @@
 typedef enum: uint8_t {
     FIRST_COURSE = 0,
     MAIN_COURSE  = 1,
-    COFFEE_BAR       = 2,
+    COFFEE_BAR   = 2,
     CHECKOUT     = 3,
     TABLE        = 4,
     EXIT         = 5
 } location_t;
+
+struct pair_station{
+    location_t id;
+    int avg_time;
+};
 
 typedef struct {
     pid_t  pid;
@@ -33,7 +38,7 @@ typedef struct {
     bool       has_ticket;
     location_t current_location;
 
-    size_t     taken_plates[4];
+    size_t     taken_plates[MAX_DISHES];
     int        plates_count;
 
     bool       served;
@@ -59,49 +64,46 @@ typedef enum {
 } dish_type;
 
 typedef struct {
-    location_t  type;
-    struct {
-        size_t  worked_time;
-        size_t  wasted_time;
-        size_t  served_dishes;
-        size_t  left_dishes;
-        size_t  earnings; // 0 for all non checkout stations
-    } stats; // struct for cleaner code
-    struct {
-        int client_ids[10]; 
-        int head;
-        int tail;
-        int count;
-        int mutex_sem_id; 
-    } client_queue;
-    worker workers[NOF_WORKERS];
-    dish_t menu   [MAX_DISHES];
+    size_t  worked_time;
+    size_t  wasted_time;
+    size_t  served_dishes;
+    size_t  left_dishes;
+    size_t  earnings; // 0 for all non checkout stations
+} stats;
+
+typedef struct {
+    stats      stats;
+    location_t type;
+    worker     workers[NOF_WORKERS];
+    dish_t     menu   [DISHES_COUNT];
 } station;
 
 typedef struct {
-    station stations[4];
-    client  clients [NOF_USERS];
-} sim_ctx;
+    stats global_stats;
 
-typedef struct {
     dish_available_t main_courses[MAX_MAIN_COURSES];
     dish_available_t first_courses[MAX_FIRST_COURSES];
-    dish_available_t side_dishes[MAX_SIDE_DISHES];
     dish_available_t coffee_dishes[MAX_COFFEE_DISHES];
 
     dish_t main_courses_menu[MAX_MAIN_COURSES];
     dish_t first_courses_menu[MAX_FIRST_COURSES];
-    dish_t side_dish_menu[MAX_SIDE_DISHES];
     dish_t coffee_menu[MAX_COFFEE_DISHES];
+
+    // Message queues
+    size_t id_msg_q[NOF_STATIONS];
+
+    struct {
+        pid_t      worker;
+        location_t role;
+    } roles[NOF_WORKERS];
 
     size_t main_menu_size;
     size_t first_menu_size;
-    size_t side_menu_size;
     size_t coffee_menu_size;
 
     bool is_sim_running;
 
-} SharedData;
+} sim_ctx_t;
 
 
 

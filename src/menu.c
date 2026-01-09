@@ -3,7 +3,6 @@
 //
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "objects.h"
@@ -73,8 +72,8 @@ load_category(
 
 void
 load_menu(
-    const char* filename,
-    SharedData* data
+    char* filename,
+    sim_ctx_t* data
 ) {
     char* raw_json = read_file(filename);
     if (!raw_json) panic("ERROR: Read json failed");
@@ -82,12 +81,12 @@ load_menu(
     cJSON* json = cJSON_Parse(raw_json);
     if (!json) {
         free(json);
+        free(filename);
         panic("ERROR: Failed to parse JSON");
     }
 
     load_category(json, MAIN, data->main_courses_menu, &data->main_menu_size, MAX_MAIN_COURSES);
     load_category(json, FIRST, data->first_courses_menu, &data->first_menu_size, MAX_FIRST_COURSES);
-    load_category(json, SIDE, data->side_dish_menu, &data->side_menu_size, MAX_SIDE_DISHES);
     load_category(json, COFFEE, data->coffee_menu, &data->coffee_menu_size, MAX_COFFEE_DISHES);
 
     cJSON_Delete(json);

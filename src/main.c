@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
+#include <sys/wait.h>
 
 #include "const.h"
 #include "objects.h"
@@ -95,13 +96,16 @@ init_client(
 
         panic("ERROR: Execve failed for client\n");
     }
+
+    // NOTE: REMOVE THIS LATER
+    wait(NULL);
 }
 
 void
 init_worker(
     simctx_t *ctx,
-    char      *shm_id, 
-    size_t     idx
+    char     *shm_id, 
+    size_t    idx
 ) {
     const pid_t pid = zfork();
 
@@ -114,6 +118,9 @@ init_worker(
 
         panic("ERROR: Execve failed for worker n. %zu\n", idx);
     }
+
+    // NOTE: REMOVE THIS LATER
+    wait(NULL);
 }
 
 int

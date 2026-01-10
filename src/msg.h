@@ -3,7 +3,7 @@
 
 #include "objects.h"
 #include "tools.h"
-#include <cstddef>
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/msg.h>
 #include <unistd.h>

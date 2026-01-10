@@ -9,5 +9,6 @@ main(
     // TODO: here the worker logic
     printf("Worker args:\n");
     for (int i=0; i<argc;i++)
-        printf("%d: %s,", i, argv[i]);
+        printf("%d: %s%s", i, argv[i], i==argc-1 ? ";":", ");
+    printf("\n");
 }

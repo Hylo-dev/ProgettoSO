@@ -22,12 +22,14 @@ typedef const void* let_any;
 
 static inline void
 panic(const char* fmt, ...) {
+    int err = errno;
+
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
-    exit(errno);
+    exit(err ? err : EXIT_FAILURE);
 }
 
 static inline any

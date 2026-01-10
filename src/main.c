@@ -89,9 +89,9 @@ init_client(
     const pid_t pid = zfork();
 
     if (pid == 0) {
-        char *args[] = { "./client", first_msgq_id, NULL };
+        char *args[] = { "client", first_msgq_id, NULL };
 
-        execve("./client", args, NULL);
+        execve("./bin/client", args, NULL);
 
         panic("ERROR: Execve failed for client\n");
     }
@@ -108,9 +108,9 @@ init_worker(
     if (pid == 0) {
         ctx->roles[idx].worker = getpid();
 
-        char *args[] = { "./worker", shm_id, NULL };
+        char *args[] = { "worker", shm_id, NULL };
 
-        execve("./worker", args, NULL);
+        execve("./bin/worker", args, NULL);
 
         panic("ERROR: Execve failed for worker n. %zu\n", idx);
     }

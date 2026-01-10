@@ -1,136 +1,132 @@
 # ==========================================
-#   Project Makefile (Modular Architecture)
-#   Compiler: clang
+#   Project Makefile (Auto-Discovery Mode)
+#   Compiler: gcc / clang
 # ==========================================
 
-# --- Terminal Colors & Formatting ---
-C_GREEN  = \033[1;32m
-C_YELLOW = \033[1;33m
-C_CYAN   = \033[1;36m
-C_RED    = \033[1;31m
-C_RESET  = \033[0m
+TAG_BUILD = [BUILD]
+TAG_CLEAN = [CLEAN]
+TAG_EXEC  = [EXEC ]
+TAG_TEST  = [TEST ]
 
-TAG_BUILD = $(C_GREEN)[BUILD]$(C_RESET)
-TAG_CLEAN = $(C_YELLOW)[CLEAN]$(C_RESET)
-TAG_EXEC  = $(C_CYAN)[EXEC ]$(C_RESET)
-TAG_TEST  = $(C_RED)[TEST ]$(C_RESET)
-
-# Compiler settings
 CC = gcc
 
-# --- Directories Structure ---
+# --- Directories ---
 APP_DIR      = src
 TEST_DIR     = test
 LIB_DIR      = libds
+OBJDIR       = obj
+BINDIR       = bin
 
-OBJDIR = obj
-BINDIR = bin
+# --- 1. Gestione Intelligente dei Sorgenti ---
 
-# --- Files Definition ---
+# A. Trova TUTTI i file .c in src/
+ALL_APP_SOURCES = $(wildcard $(APP_DIR)/*.c)
 
-# 1. Main Project Files (OS App)
-APP_SOURCES  = $(wildcard $(APP_DIR)/*.c)
-APP_OBJECTS  = $(patsubst $(APP_DIR)/%.c, $(OBJDIR)/app/%.o, $(APP_SOURCES))
+# B. Lista dei file che contengono il 'main' (Entry Points)
+# Questi NON devono essere linkati tra loro!
+MAIN_SRC   = $(APP_DIR)/main.c
+WORKER_SRC = $(APP_DIR)/worker.c
+CLIENT_SRC = $(APP_DIR)/client.c
+EXCLUDED_SRCS = $(MAIN_SRC) $(WORKER_SRC) $(CLIENT_SRC)
 
-# 2. Dictionary Library Files (Implementazione in libds)
-LIB_SOURCES  = $(wildcard $(LIB_DIR)/*.c)
-LIB_OBJECTS  = $(patsubst $(LIB_DIR)/%.c, $(OBJDIR)/lib/%.o, $(LIB_SOURCES))
+# C. Calcola i file Comuni (Sottrae i Main da Tutti i sorgenti)
+# Se aggiungi menu.c o utils.c, finiscono qui automaticamente.
+COMMON_SOURCES = $(filter-out $(EXCLUDED_SRCS), $(ALL_APP_SOURCES))
+COMMON_OBJECTS = $(patsubst $(APP_DIR)/%.c, $(OBJDIR)/app/%.o, $(COMMON_SOURCES))
 
-# 3. Test Runner Files (Main di test in test/)
-TEST_SRC     = $(TEST_DIR)/main.c
-TEST_OBJ     = $(patsubst $(TEST_DIR)/%.c, $(OBJDIR)/test/%.o, $(TEST_SRC))
+# D. Definisci gli oggetti degli Entry Points
+OBJ_MAIN   = $(OBJDIR)/app/main.o
+OBJ_WORKER = $(OBJDIR)/app/worker.o
+OBJ_CLIENT = $(OBJDIR)/app/client.o
 
+# E. Libreria Esterna (libds)
+LIB_SOURCES = $(wildcard $(LIB_DIR)/*.c)
+LIB_OBJECTS = $(patsubst $(LIB_DIR)/%.c, $(OBJDIR)/lib/%.o, $(LIB_SOURCES))
 
-# --- Output Executables ---
-APP_EXEC  = $(BINDIR)/os_app
-TEST_EXEC = $(BINDIR)/test_dict_runner
+# F. Test
+TEST_SRC    = $(TEST_DIR)/main.c
+TEST_OBJ    = $(patsubst $(TEST_DIR)/%.c, $(OBJDIR)/test/%.o, $(TEST_SRC))
 
-# --- Flags Configuration ---
+# --- Eseguibili Finali ---
+EXEC_MAIN   = $(BINDIR)/main
+EXEC_WORKER = $(BINDIR)/worker
+EXEC_CLIENT = $(BINDIR)/client
+TEST_EXEC   = $(BINDIR)/test_dict_runner
 
-# Include paths: Include src/ e libds/
-BASE_FLAGS = -Wno-fixed-enum-extension -Wall -Wextra -Wpedantic -Wconversion -D_GNU_SOURCE -I$(APP_DIR) -I$(LIB_DIR)
-
-# Debug flags
+# --- Flags ---
+BASE_FLAGS  = -Wall -Wextra -Wpedantic -Wconversion -D_GNU_SOURCE -I$(APP_DIR) -I$(LIB_DIR)
 DEBUG_FLAGS = -g -fsanitize=address,undefined -fno-omit-frame-pointer
-
-# Production flags
-PROD_FLAGS = -O3 -march=native -flto -DNDEBUG
-
-# Default CFLAGS
-CFLAGS = $(BASE_FLAGS) $(DEBUG_FLAGS)
+PROD_FLAGS  = -O3 -march=native -flto -DNDEBUG
+CFLAGS      = $(BASE_FLAGS) $(DEBUG_FLAGS)
 
 # --- Targets ---
 
-.PHONY: all clean rebuild production run test-lib test-lib-debug test-lib-prod
+.PHONY: all clean rebuild production run-main run-worker run-client
 
-all: $(APP_EXEC)
-	@echo "$(TAG_BUILD) OS Application compiled successfully."
+all: $(EXEC_MAIN) $(EXEC_WORKER) $(EXEC_CLIENT)
+	@echo "$(TAG_BUILD) Project compiled successfully."
 
 production: CFLAGS = $(BASE_FLAGS) $(PROD_FLAGS)
-production: clean $(APP_EXEC)
-	@echo "$(TAG_BUILD) Production release compiled."
+production: clean all
+	@echo "$(TAG_BUILD) Production release ready."
 
-test-lib-debug-build: $(TEST_EXEC)
+# --- Linking Rules (Automatizzati) ---
 
-test-lib-prod-build: CFLAGS = $(BASE_FLAGS) $(PROD_FLAGS)
-test-lib-prod-build: $(TEST_EXEC)
-
-# --- Linking Rules ---
-
-# Link Main App (App Objects + Lib Objects)
-$(APP_EXEC): $(APP_OBJECTS) $(LIB_OBJECTS)
+# Link Main: Oggetto Main + Oggetti Comuni (menu.o, etc) + Libreria
+$(EXEC_MAIN): $(OBJ_MAIN) $(COMMON_OBJECTS) $(LIB_OBJECTS)
 	@mkdir -p $(BINDIR)
-	@echo "$(TAG_BUILD) Linking OS App..."
-	@$(CC) $(CFLAGS) $(APP_OBJECTS) $(LIB_OBJECTS) -o $(APP_EXEC)
+	@echo "$(TAG_BUILD) Linking MAIN (with common files)..."
+	@$(CC) $(CFLAGS) $^ -o $@
 
-# Link Test Runner (Test Main + Lib Objects)
+# Link Worker: Oggetto Worker + Oggetti Comuni + Libreria
+$(EXEC_WORKER): $(OBJ_WORKER) $(COMMON_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(BINDIR)
+	@echo "$(TAG_BUILD) Linking WORKER (with common files)..."
+	@$(CC) $(CFLAGS) $^ -o $@
+
+# Link Client: Oggetto Client + Oggetti Comuni + Libreria
+$(EXEC_CLIENT): $(OBJ_CLIENT) $(COMMON_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(BINDIR)
+	@echo "$(TAG_BUILD) Linking CLIENT (with common files)..."
+	@$(CC) $(CFLAGS) $^ -o $@
+
+# Link Test
 $(TEST_EXEC): $(TEST_OBJ) $(LIB_OBJECTS)
 	@mkdir -p $(BINDIR)
-	@echo "$(TAG_TEST) Linking Dictionary Stress Test..."
-	@$(CC) $(CFLAGS) $(TEST_OBJ) $(LIB_OBJECTS) -o $(TEST_EXEC)
+	@echo "$(TAG_TEST) Linking Test Runner..."
+	@$(CC) $(CFLAGS) $^ -o $@
 
 # --- Compilation Rules ---
 
-# Compile App Sources
+# Compila qualsiasi .c in src/ dentro obj/app/
 $(OBJDIR)/app/%.o: $(APP_DIR)/%.c
 	@mkdir -p $(OBJDIR)/app
-	@echo "$(TAG_BUILD) Compiling App: $<..."
+	@echo "$(TAG_BUILD) Compiling: $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile Library Sources (libds)
+# Compila libreria
 $(OBJDIR)/lib/%.o: $(LIB_DIR)/%.c
 	@mkdir -p $(OBJDIR)/lib
-	@echo "$(TAG_BUILD) Compiling Library: $<..."
+	@echo "$(TAG_BUILD) Compiling Lib: $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile Test Runner (test)
+# Compila test
 $(OBJDIR)/test/%.o: $(TEST_DIR)/%.c
 	@mkdir -p $(OBJDIR)/test
-	@echo "$(TAG_BUILD) Compiling Test Runner: $<..."
+	@echo "$(TAG_BUILD) Compiling Test: $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-# --- Utility Targets ---
+# --- Utilities ---
 
 clean:
 	@rm -rf $(OBJDIR) $(BINDIR)
-	@rm -rf *.dSYM
-	@echo "$(TAG_CLEAN) All artifacts removed."
+	@echo "$(TAG_CLEAN) Cleaned."
 
-rebuild: clean all
+run-main: $(EXEC_MAIN)
+	@./$(EXEC_MAIN)
 
-run: $(APP_EXEC)
-	@echo "$(TAG_EXEC) Running OS Application:\n"
-	@./$(APP_EXEC)
-	@echo "\n$(TAG_EXEC) Finished."
+run-worker: $(EXEC_WORKER)
+	@./$(EXEC_WORKER)
 
-test-lib-debug: clean test-lib-debug-build
-	@echo "$(TAG_TEST) Running Dictionary Stress Test [DEBUG MODE]:\n"
-	@./$(TEST_EXEC)
-	@echo "\n$(TAG_TEST) Test Completed."
-
-test-lib-prod: clean test-lib-prod-build
-	@echo "$(TAG_TEST) Running Dictionary Stress Test [PRODUCTION MODE - O3]:\n"
-	@./$(TEST_EXEC)
-	@echo "\n$(TAG_TEST) Test Completed."
-
-test-lib: test-lib-prod
+run-client: $(EXEC_CLIENT)
+	@./$(EXEC_CLIENT)

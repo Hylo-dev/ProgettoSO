@@ -1,12 +1,12 @@
-#ifndef OBJECTS_H
-#define OBJECTS_H
+#ifndef _OBJECTS_H
+#define _OBJECTS_H
 
 #include <stdbool.h>
 
 #include "const.h"
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/_types/_pid_t.h>
+#include <sys/types.h>
 
 #define DISH_NAME_MAX_LEN 32
 
@@ -103,7 +103,7 @@ typedef struct {
 
     bool is_sim_running;
 
-} sim_ctx_t;
+} simctx_t;
 
 
 

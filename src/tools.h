@@ -6,8 +6,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <unistd.h>
 #include <sys/msg.h>
-#include <sys/_types/_key_t.h>
+#include <sys/shm.h>
 
 // any type
 typedef       void* any; 
@@ -56,7 +57,37 @@ zcalloc(
     return ptr;
 }
 
-// ====================== SHM WRAPPER ======================
+/* ====================== UNI WRAPPER ====================== */
+static inline pid_t
+zfork() {
+    pid_t pid = fork();
+    if (pid < 0)
+        panic("ERROR: Failed to launch a new process (fork)\n");
+    return pid;
+}
+
+/* ====================== SHM WRAPPER ====================== */
+static inline size_t
+zshmget(key_t key, size_t size, int mode){
+    int res = shmget(key, size, mode);
+    if (res < 0)
+        panic("ERROR: Shared memory allocation is failed\n");
+    return (size_t)res;
+}
+
+static inline any
+zshmat(
+          size_t shmid,
+    const any    shmaddr,
+          int    shmflg
+){
+    any res = shmat((int)shmid, shmaddr, shmflg);
+    if (res == (void*)-1)
+        panic("ERROR: Shared memory `at` is failed\n");
+    return res;
+}
+
+/* ====================== MSG WRAPPER ====================== */
 static inline size_t
 zmsgget(
     const key_t key,

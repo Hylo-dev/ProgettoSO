@@ -1,22 +1,32 @@
+#include <stddef.h>
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
 
-#include "objects.h"
+#include <unistd.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
-#include <unistd.h>
-#include <sys/time.h>
 
-#include "dict.h"
+#include "const.h"
+#include "objects.h"
 #include "tools.h"
 #include "menu.h"
 
 #define SHM_RW 0666
 
 void
-sim_day(sim_ctx_t* ctx);
+init_client(char*);
 
 void
-assign_roles(sim_ctx_t* ctx);
+init_worker(
+    simctx_t*, char*, size_t
+);
+
+void
+sim_day(simctx_t* ctx);
+
+void
+assign_roles(simctx_t* ctx);
 
 int main(void) {
     /*
@@ -63,15 +73,11 @@ int main(void) {
             Tu: Gestisci il movimento del client (decidere dove andare, mettersi in coda queue_push, aspettare).
             Bro: Gestisce il worker (prelevare dalla coda queue_pop, servire, aggiornare statistiche).
     */
-    srand(time(NULL));
+    srand((unsigned int)time(NULL));
 
-    const int shm_id = shmget(IPC_PRIVATE, sizeof(sim_ctx_t), IPC_CREAT | SHM_RW);
-    if (shm_id < 0)
-        panic("ERROR: Shared memory allocation is failed\n");
+    const size_t shm_id = zshmget(IPC_PRIVATE, sizeof(simctx_t), IPC_CREAT | SHM_RW);
 
-    sim_ctx_t* ctx = shmat(shm_id, NULL, 0);
-    if (ctx == (void*)-1)
-        panic("ERROR: Shared memory `at` is failed\n");
+    simctx_t* ctx = (simctx_t*)zshmat(shm_id, NULL, 0);
 
     // ----------------- STATIONS -----------------
 
@@ -80,7 +86,7 @@ int main(void) {
     }
 
     // ----------------- CLEAN SHM -----------------
-    memset(ctx, 0, sizeof(sim_ctx_t));
+    memset(ctx, 0, sizeof(simctx_t));
     ctx->is_sim_running = true;
 
     // ----------------- GET MENU -----------------
@@ -103,25 +109,53 @@ int main(void) {
 
     // CREATE WORKERS
     char str_shm_id[16];
-    sprintf(str_shm_id, "%d", shm_id);
 
+    sprintf(str_shm_id, "%zu", shm_id);
     for (size_t i = 0; i < NOF_WORKERS; i++) {
-        const pid_t pid = fork();
-        if (pid < 0) panic("ERROR: Fork worker failed\n");
+        init_worker(ctx, str_shm_id, i);
+    }
 
-        if (pid == 0) {
-            ctx->roles[i].worker = getpid();
-
-            char *args[] = { "./worker", str_shm_id, NULL };
-
-            execve("./worker", args, NULL);
-
-            panic("ERROR: Execve failed for worker\n");
-        }
+    sprintf(str_shm_id, "%zu", ctx->id_msg_q[0]);
+    for (size_t i = 0; i < NOF_USERS; i++){
+        init_client(str_shm_id);
     }
 
     for (size_t i = 0; i < SIM_DURATION; i++) {
         sim_day(ctx);
+    }
+}
+
+void
+init_client(
+    char *first_msgq_id
+) {
+    const pid_t pid = zfork();
+
+    if (pid == 0) {
+        char *args[] = { "./client", first_msgq_id, NULL };
+
+        execve("./client", args, NULL);
+
+        panic("ERROR: Execve failed for client\n");
+    }
+}
+
+void
+init_worker(
+    simctx_t *ctx,
+    char      *shm_id, 
+    size_t     idx
+) {
+    const pid_t pid = zfork();
+
+    if (pid == 0) {
+        ctx->roles[idx].worker = getpid();
+
+        char *args[] = { "./worker", shm_id, NULL };
+
+        execve("./worker", args, NULL);
+
+        panic("ERROR: Execve failed for worker n. %zu\n", idx);
     }
 }
 
@@ -137,7 +171,7 @@ _compare_pair_station(
 }
 
 void
-assign_roles(sim_ctx_t* ctx) {
+assign_roles(simctx_t* ctx) {
     location_t roles_buffer[NOF_WORKERS];
     int assigned_count = 0;
 
@@ -176,6 +210,6 @@ assign_roles(sim_ctx_t* ctx) {
 }
 
 void
-sim_day(sim_ctx_t* ctx) {
+sim_day(simctx_t* ctx) {
     assign_roles(ctx);
 }

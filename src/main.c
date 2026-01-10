@@ -84,6 +84,13 @@ int main(void) {
 }
 
 void
+sim_day(simctx_t* ctx) {
+    assign_roles(ctx);
+}
+
+/* ========================== PROCESSES ========================== */ 
+
+void
 init_client(
     char *first_msgq_id
 ) {
@@ -122,6 +129,8 @@ init_worker(
     // NOTE: REMOVE THIS LATER
     wait(NULL);
 }
+
+/* ========================== SUPPORT ========================== */ 
 
 int
 _compare_pair_station(
@@ -171,9 +180,4 @@ assign_roles(simctx_t* ctx) {
     for (int i = 0; i < NOF_WORKERS; i++) {
         ctx->roles[i].role = roles_buffer[i];
     }
-}
-
-void
-sim_day(simctx_t* ctx) {
-    assign_roles(ctx);
 }

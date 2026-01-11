@@ -33,16 +33,21 @@ typedef struct {
     size_t pause_time;  // cumulative time spent on pause
 } worker;
 
+
+
+struct client_menu {
+    size_t cnt;
+    size_t data[MAX_DISHES];
+};
+
 typedef struct {
     pid_t      pid;
-    bool       has_ticket;
-    location_t current_location;
-
-    size_t     taken_plates[MAX_DISHES];
-    int        plates_count;
-
+    bool       ticket;
+    location_t loc;
     bool       served;
-} client;
+    size_t     msgq;
+    struct client_menu dishes;
+} client_t;
 
 typedef struct {
     size_t id;
@@ -57,10 +62,9 @@ typedef struct {
 } dish_available_t;
 
 typedef enum {
-    MAIN,
-    FIRST,
-    SIDE,
-    COFFEE
+    FIRST  = 0,
+    MAIN   = 1,
+    COFFEE = 2
 } dish_type;
 
 typedef struct {
@@ -81,8 +85,8 @@ typedef struct {
 typedef struct {
     stats global_stats;
 
-    dish_available_t main_courses[MAX_MAIN_COURSES];
     dish_available_t first_courses[MAX_FIRST_COURSES];
+    dish_available_t main_courses[MAX_MAIN_COURSES];
     dish_available_t coffee_dishes[MAX_COFFEE_DISHES];
 
     dish_t main_courses_menu[MAX_MAIN_COURSES];

@@ -13,7 +13,6 @@
 const char* dish_names[] = {
     "main",
     "first",
-    "side",
     "coffee"
 };
 

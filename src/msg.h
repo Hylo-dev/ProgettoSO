@@ -19,36 +19,37 @@ typedef struct {
 
 static int
 send_msg(
-    int    qid,
+    size_t qid,
     long   mtype,
+    pid_t  pid,
     size_t dish_id
 ) {
     msg_dish_t msg = {
         mtype,
-        getpid(),
+        pid,
         0,
         (dish_t){ dish_id, "", 0, 0}
     };
 
     size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
 
-    if (msgsnd(qid, &msg, msg_size, 0) == -1)
+    if (msgsnd((int)qid, &msg, msg_size, 0) == -1)
         panic("ERROR: Message failed to send - queueid: %d, pid: %d", qid, getpid());
     return 0;
 }   
 
 static int
 recive_msg(
-    int  qid,
-    long mtype,
+    size_t qid,
+    long   mtype,
     msg_dish_t *out
 ) {
     size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
 
-    ssize_t read = msgrcv(qid, out, msg_size, mtype, 0);
+    ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
 
     if (read < 0)
-        panic("ERROR: failed sending a message - queueid: %d, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
+        panic("ERROR: failed sending a message - queueid: %zu, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
 
     return 0;
 }

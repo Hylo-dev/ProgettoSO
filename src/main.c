@@ -73,7 +73,6 @@ int main(void) {
         init_worker(ctx, str_shm_id, i);
     }
 
-    sprintf(str_shm_id, "%zu", ctx->id_msg_q[0]);
     for (size_t i = 0; i < NOF_USERS; i++){
         init_client(str_shm_id);
     }
@@ -92,19 +91,28 @@ sim_day(simctx_t* ctx) {
 
 void
 init_client(
-    char *first_msgq_id
+    char *shmid
 ) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
-        char *args[] = { "client", first_msgq_id, NULL };
+        /* { exec name,
+             bool ticket,
+             shmid for the menu
+           }
+         */
+        char *args[] = {
+            "client",
+            rand()%2 ? "1":"0",
+            shmid,
+            NULL
+        };
 
         execve("./bin/client", args, NULL);
 
         panic("ERROR: Execve failed for client\n");
     }
 
-    // NOTE: REMOVE THIS LATER
     wait(NULL);
 }
 

@@ -3,7 +3,7 @@
 
 /* =================== CONST =================== */
 #define NOF_STATIONS 4
-#define MAX_DISHES 4
+#define MAX_DISHES 3
 
 /* =================== DISH MAX =================== */
 #define MAX_MAIN_COURSES 10

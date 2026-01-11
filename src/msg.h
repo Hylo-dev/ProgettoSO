@@ -19,19 +19,10 @@ typedef struct {
 
 static int
 send_msg(
-    size_t qid,
-    long   mtype,
-    pid_t  pid,
-    size_t dish_id
+    const size_t     qid,
+    const msg_dish_t msg,
+    const size_t     msg_size
 ) {
-    msg_dish_t msg = {
-        mtype,
-        pid,
-        0,
-        (dish_t){ dish_id, "", 0, 0}
-    };
-
-    size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
 
     if (msgsnd((int)qid, &msg, msg_size, 0) == -1)
         panic("ERROR: Message failed to send - queueid: %d, pid: %d", qid, getpid());
@@ -40,16 +31,16 @@ send_msg(
 
 static int
 recive_msg(
-    size_t qid,
-    long   mtype,
+    const size_t qid,
+    const long   mtype,
     msg_dish_t *out
 ) {
-    size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
+    const size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
 
-    ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
+    const ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
 
     if (read < 0)
-        panic("ERROR: failed sending a message - queueid: %zu, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
+        panic("ERROR: failed sending a message - queue_id: %zu, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
 
     return 0;
 }

@@ -6,10 +6,11 @@
 #define MAX_DISHES 3
 
 /* =================== DISH MAX =================== */
-#define MAX_MAIN_COURSES 10
-#define MAX_FIRST_COURSES 10
-#define MAX_SIDE_DISHES 10
-#define MAX_COFFEE_DISHES 10
+#define MAX_MAIN 10
+#define MAX_FIRST 10
+#define MAX_COFFEE 10
+
+#define MAX_ELEMENTS 10
 
 /* =================== SIM. DURATION =================== */
 #define SIM_DURATION 5 /* days */

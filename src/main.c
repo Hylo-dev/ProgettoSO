@@ -20,7 +20,7 @@ init_client(char*, char*);
 
 void
 init_worker(
-    simctx_t*, char*, size_t, char*
+    simctx_t*, char*, size_t, char*, char*
 );
 
 void
@@ -31,8 +31,11 @@ assign_roles(simctx_t* ctx);
 
 int main(void) {
 
-    int zprintf_sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
+    const int zprintf_sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
     semctl(zprintf_sem, 0, SETVAL, 1);
+
+    const int shm_sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
+    semctl(shm_sem, 0, SETVAL, 1);
     
     srand((unsigned int)time(NULL));
 
@@ -40,42 +43,48 @@ int main(void) {
 
     simctx_t* ctx = (simctx_t*)zshmat(shm_id, NULL, 0);
 
-    // ----------------- STATIONS -----------------
-
-    for (size_t i = 0; i < NOF_STATIONS; i++) {
-        ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
-    }
-
     // ----------------- CLEAN SHM -----------------
     memset(ctx, 0, sizeof(simctx_t));
     ctx->is_sim_running = true;
 
+    // ----------------- STATIONS -----------------
+
+    for (size_t i = 0; i < NOF_STATIONS; i++) {
+        ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
+        // zprintf(zprintf_sem, "QUEUE: %zu\n", ctx->id_msg_q[i]);
+    }
+
     // ----------------- GET MENU -----------------
     load_menu("menu.json", ctx);
 
-    for (size_t i = 0; i < ctx->main_menu_size; i++) {
-        ctx->main_courses[i].id       = ctx->main_courses_menu[i].id;
-        ctx->main_courses[i].quantity = 100;
+    for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {
+        ctx->available_dishes[MAIN].elements[i].id = ctx->menu[MAIN].elements[i].id;
+        ctx->available_dishes[MAIN].elements[i].quantity = 100;
+        ctx->available_dishes[MAIN].size++;
     }
 
-    for (size_t i = 0; i < ctx->first_menu_size; i++) {
-        ctx->first_courses[i].id       = ctx->first_courses_menu[i].id;
-        ctx->first_courses[i].quantity = 100;
+    for (size_t i = 0; i < ctx->menu[FIRST].size; i++) {
+        ctx->available_dishes[FIRST].elements[i].id = ctx->menu[FIRST].elements[i].id;
+        ctx->available_dishes[FIRST].elements[i].quantity = 100;
+        ctx->available_dishes[FIRST].size++;
     }
 
-    for (size_t i = 0; i < ctx->coffee_menu_size; i++) {
-        ctx->coffee_dishes[i].id       = ctx->coffee_menu[i].id;
-        ctx->coffee_dishes[i].quantity = 100;
+    for (size_t i = 0; i < ctx->menu[COFFEE].size; i++) {
+        ctx->available_dishes[COFFEE].elements[i].id = ctx->menu[COFFEE].elements[i].id;
+        ctx->available_dishes[COFFEE].elements[i].quantity = 100;
+        ctx->available_dishes[COFFEE].size++;
     }
 
     // CREATE WORKERS
     char str_shm_id[16];
     char str_zprintf[16];
+    char str_shm_sem[16];
 
     sprintf(str_shm_id, "%zu", shm_id);
     sprintf(str_zprintf, "%d", zprintf_sem);
+    sprintf(str_shm_sem, "%d", shm_sem);
     for (size_t i = 0; i < NOF_WORKERS; i++) {
-        init_worker(ctx, str_shm_id, i, str_zprintf);
+        init_worker(ctx, str_shm_id, i, str_zprintf, str_shm_sem);
     }
 
     for (size_t i = 0; i < NOF_USERS; i++){
@@ -85,6 +94,10 @@ int main(void) {
     for (size_t i = 0; i < SIM_DURATION; i++) {
         sim_day(ctx);
     }
+
+    while(wait(NULL) > 0);
+
+    return 0;
 }
 
 void
@@ -120,7 +133,7 @@ init_client(
         panic("ERROR: Execve failed for client\n");
     }
 
-    wait(NULL);
+    // wait(NULL);
 }
 
 void
@@ -128,17 +141,23 @@ init_worker(
     simctx_t *ctx,
     char     *shm_id, 
     size_t    idx,
-    char*     zprintf_sem
+    char*     zprintf_sem,
+    char*     shm_sem
 ) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
         ctx->roles[idx].worker = getpid();
 
+        // { exec name, size_t shm_id, loc_t role, int zprt_sem, int shm_sem }
+        char str_role_idx[2];
+        sprintf(str_role_idx, "%zu", idx);
         char *args[] = {
             "worker",
             shm_id,
+            str_role_idx,
             zprintf_sem,
+            shm_sem,
             NULL };
 
         execve("./bin/worker", args, NULL);
@@ -147,7 +166,7 @@ init_worker(
     }
 
     // NOTE: REMOVE THIS LATER
-    wait(NULL);
+    // wait(NULL);
 }
 
 /* ========================== SUPPORT ========================== */ 

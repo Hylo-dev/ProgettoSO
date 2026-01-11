@@ -107,28 +107,36 @@ zmsgget(
 
 
 static void
-sem_p(int sem_id, int sem_num) {
+sem_wait(
+    const int sem_id,
+    const int sem_num
+) {
     struct sembuf sops;
-    sops.sem_num = sem_num;
-    sops.sem_op = -1;
+    sops.sem_num = (unsigned short)sem_num;
+    sops.sem_op  = -1;
     sops.sem_flg = 0;
-    // Gestione dell'interruzione da segnale (EINTR)
+
+    // Manage INTR SIG (EINTR)
     while (semop(sem_id, &sops, 1) == -1) {
         if (errno != EINTR) {
-            perror("Errore sem_p stampa");
+            perror("ERROR: sem_wait interrupt");
             break; 
         }
     }
 }
 
 static void
-sem_v(int sem_id, int sem_num) {
+sem_signal(
+    const int sem_id,
+    const int sem_num
+) {
     struct sembuf sops;
-    sops.sem_num = sem_num;
-    sops.sem_op = 1;
+    sops.sem_num = (unsigned short)sem_num;
+    sops.sem_op  = 1;
     sops.sem_flg = 0;
+
     if (semop(sem_id, &sops, 1) == -1) {
-        perror("Errore sem_v stampa");
+        perror("ERROR: sem_signal failed");
     }
 }
 
@@ -139,7 +147,7 @@ zprintf(
 ) {
     va_list args;
 
-    sem_p(sem_id, 0);
+    sem_wait(sem_id, 0);
 
     va_start(args, fmt);
     vprintf(fmt, args);
@@ -147,7 +155,7 @@ zprintf(
 
     fflush(stdout);
 
-    sem_v(sem_id, 0);
+    sem_signal(sem_id, 0);
 }
 
 

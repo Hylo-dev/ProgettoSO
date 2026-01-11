@@ -71,8 +71,8 @@ load_category(
 
 void
 load_menu(
-    char     *filename,
-    simctx_t *ctx
+    const char *filename,
+    simctx_t   *ctx
 ) {
     char* raw_json = read_file(filename);
 
@@ -83,9 +83,9 @@ load_menu(
         panic("ERROR: Failed to parse JSON");
     }
 
-    load_category(json, MAIN, ctx->main_courses_menu, &ctx->main_menu_size, MAX_MAIN_COURSES);
-    load_category(json, FIRST, ctx->first_courses_menu, &ctx->first_menu_size, MAX_FIRST_COURSES);
-    load_category(json, COFFEE, ctx->coffee_menu, &ctx->coffee_menu_size, (int)MAX_COFFEE_DISHES);
+    load_category(json, MAIN, ctx->menu[MAIN].elements, &ctx->menu[MAIN].size, MAX_ELEMENTS);
+    load_category(json, FIRST, ctx->menu[FIRST].elements, &ctx->menu[FIRST].size, MAX_ELEMENTS);
+    load_category(json, COFFEE, ctx->menu[COFFEE].elements, &ctx->menu[COFFEE].size, MAX_ELEMENTS);
 
     cJSON_Delete(json);
     free(raw_json);

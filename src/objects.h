@@ -27,11 +27,15 @@ struct pair_station{
 };
 
 typedef struct {
-    pid_t  pid;
-    bool   active;
-    size_t wait_time;   // time to wait for each pause
-    size_t pause_time;  // cumulative time spent on pause
-} worker;
+    pid_t      pid;
+    bool       active;
+
+    location_t curr_role;
+    size_t     queue;
+
+    // size_t wait_time;   // time to wait for each pause
+    size_t     pause_time;  // cumulative time spent on pause
+} worker_t;
 
 
 
@@ -78,20 +82,36 @@ typedef struct {
 typedef struct {
     stats      stats;
     location_t type;
-    worker     workers[NOF_WORKERS];
+    worker_t     workers[NOF_WORKERS];
     dish_t     menu   [DISHES_COUNT];
 } station;
 
 typedef struct {
     stats global_stats;
 
-    dish_available_t first_courses[MAX_FIRST_COURSES];
-    dish_available_t main_courses[MAX_MAIN_COURSES];
-    dish_available_t coffee_dishes[MAX_COFFEE_DISHES];
+    // dish_available_t first_courses[MAX_FIRST];
+    // dish_available_t main_courses[MAX_MAIN];
+    // dish_available_t coffee_dishes[MAX_COFFEE];
 
-    dish_t main_courses_menu[MAX_MAIN_COURSES];
-    dish_t first_courses_menu[MAX_FIRST_COURSES];
-    dish_t coffee_menu[MAX_COFFEE_DISHES];
+    // Read && Write
+    struct {
+        dish_available_t elements[MAX_ELEMENTS];
+        size_t size;
+    } available_dishes[3];
+
+    // ONLY READ
+    struct {
+        dish_t elements[MAX_ELEMENTS];
+        size_t size;
+    } menu[3];
+
+    // dish_t main_menu[MAX_MAIN];
+    // dish_t first_menu[MAX_FIRST];
+    // dish_t coffee_menu[MAX_COFFEE];
+
+    // size_t main_menu_size;
+    // size_t first_menu_size;
+    // size_t coffee_menu_size;
 
     // Message queues
     size_t id_msg_q[NOF_STATIONS];
@@ -100,10 +120,6 @@ typedef struct {
         pid_t      worker;
         location_t role;
     } roles[NOF_WORKERS];
-
-    size_t main_menu_size;
-    size_t first_menu_size;
-    size_t coffee_menu_size;
 
     bool is_sim_running;
 

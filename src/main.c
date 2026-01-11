@@ -16,11 +16,11 @@
 #define SHM_RW 0666
 
 void
-init_client(char*);
+init_client(char*, char*);
 
 void
 init_worker(
-    simctx_t*, char*, size_t
+    simctx_t*, char*, size_t, char*
 );
 
 void
@@ -30,6 +30,9 @@ void
 assign_roles(simctx_t* ctx);
 
 int main(void) {
+
+    int zprintf_sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
+    semctl(zprintf_sem, 0, SETVAL, 1);
     
     srand((unsigned int)time(NULL));
 
@@ -67,14 +70,16 @@ int main(void) {
 
     // CREATE WORKERS
     char str_shm_id[16];
+    char str_zprintf[16];
 
     sprintf(str_shm_id, "%zu", shm_id);
+    sprintf(str_zprintf, "%d", zprintf_sem);
     for (size_t i = 0; i < NOF_WORKERS; i++) {
-        init_worker(ctx, str_shm_id, i);
+        init_worker(ctx, str_shm_id, i, str_zprintf);
     }
 
     for (size_t i = 0; i < NOF_USERS; i++){
-        init_client(str_shm_id);
+        init_client(str_shm_id, str_zprintf);
     }
 
     for (size_t i = 0; i < SIM_DURATION; i++) {
@@ -91,7 +96,8 @@ sim_day(simctx_t* ctx) {
 
 void
 init_client(
-    char *shmid
+    char *shmid,
+    char *zprintf_sem
 ) {
     const pid_t pid = zfork();
 
@@ -105,6 +111,7 @@ init_client(
             "client",
             rand()%2 ? "1":"0",
             shmid,
+            zprintf_sem,
             NULL
         };
 
@@ -120,14 +127,19 @@ void
 init_worker(
     simctx_t *ctx,
     char     *shm_id, 
-    size_t    idx
+    size_t    idx,
+    char*     zprintf_sem
 ) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
         ctx->roles[idx].worker = getpid();
 
-        char *args[] = { "worker", shm_id, NULL };
+        char *args[] = {
+            "worker",
+            shm_id,
+            zprintf_sem,
+            NULL };
 
         execve("./bin/worker", args, NULL);
 

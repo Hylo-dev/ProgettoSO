@@ -43,11 +43,12 @@ main(
 ) {
     // argv must be:
     // { exec name, bool ticket, shmid for the menu }
-    if (argc != 3)
+    if (argc != 4)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
-    bool   ticket = (bool)  atoi(argv[1]);
-    size_t shmid  = (size_t)atoi(argv[2]);
+    bool   ticket  = (bool)  atoi(argv[1]);
+    size_t shmid   = (size_t)atoi(argv[2]);
+    int    zpr_sem =         atoi(argv[3]);
 
     simctx_t *ctx = (simctx_t*)zshmat(shmid, NULL, 0);
     struct client_menu menu;
@@ -76,7 +77,7 @@ main(
         // TODO: controllo se il piatto richiesto e' lo stesso di quello restituito
         dish = response.dish;
         
-        printf("RISPOSTA: \nid: %zu, name: %s", dish.id, dish.name);
+        zprintf(zpr_sem, "RISPOSTA: \nid: %zu, name: %s", dish.id, dish.name);
 
         self.loc++;
     }

@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include <sys/msg.h>
 #include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 // any type
 typedef       void* any; 
@@ -100,6 +103,51 @@ zmsgget(
         panic("ERROR: Creation message queue is failed\n");
 
     return (size_t)result;
+}
+
+
+static void
+sem_p(int sem_id, int sem_num) {
+    struct sembuf sops;
+    sops.sem_num = sem_num;
+    sops.sem_op = -1;
+    sops.sem_flg = 0;
+    // Gestione dell'interruzione da segnale (EINTR)
+    while (semop(sem_id, &sops, 1) == -1) {
+        if (errno != EINTR) {
+            perror("Errore sem_p stampa");
+            break; 
+        }
+    }
+}
+
+static void
+sem_v(int sem_id, int sem_num) {
+    struct sembuf sops;
+    sops.sem_num = sem_num;
+    sops.sem_op = 1;
+    sops.sem_flg = 0;
+    if (semop(sem_id, &sops, 1) == -1) {
+        perror("Errore sem_v stampa");
+    }
+}
+
+static void
+zprintf(
+    int sem_id,
+    const char *fmt, ...
+) {
+    va_list args;
+
+    sem_p(sem_id, 0);
+
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+
+    fflush(stdout);
+
+    sem_v(sem_id, 0);
 }
 
 

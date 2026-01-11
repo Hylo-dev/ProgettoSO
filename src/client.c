@@ -12,6 +12,6 @@ main(
     // TODO: client logic
     printf("Client args:\n");
     for (int i=0; i<argc;i++)
-        printf("%d: %s%s", i, argv[i], i==argc-1 ? ";":", ");
+        printf("%d: %s%s", i, argv[i], (i==argc-1) ? ";" : ", ");
     printf("\n");
 }

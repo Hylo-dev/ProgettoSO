@@ -10,7 +10,6 @@
 #include <string.h>
 #include <unistd.h>
 
-
 // NOTE: The client will always pick a maximum of one
 //       dish for the FIRST and one for the MAIN
 void
@@ -30,7 +29,7 @@ pick_dishes(
 
     rnd = (size_t)rand()%(ctx->menu[COFFEE].size + 1);       // coffee_menu_size+1);
     if (rnd >= ctx->menu[COFFEE].size) return;
-    
+
     menu->data[COFFEE] = ctx->menu[COFFEE].elements[rnd].id; // ctx->coffee_menu[rnd].id;
     menu->cnt++;
 }
@@ -53,62 +52,118 @@ main(
     struct client_menu menu = {0};
 
     pick_dishes(&menu, ctx);
-    
-    client_t self = {
-        .pid    = getpid(),
-        .ticket = ticket,
-        .loc    = FIRST_COURSE,
-        .served = false,
-        .msgq   = ctx->id_msg_q[FIRST_COURSE],
-        .dishes = menu
+
+    client_t self  = {
+        .pid       = getpid(),
+        .ticket    = ticket,
+        .loc       = FIRST_COURSE,
+        .served    = false,
+        .msgq      = ctx->id_msg_q[FIRST_COURSE],
+        .wait_time = 0,
+        .dishes    = menu
     };
 
     msg_dish_t response;
-    dish_t     dish;
+    //zprintf(zpr_sem, "CLIENT_l: %d, %d\n", self.loc, EXIT);
+    while (ctx->is_sim_running) {
+        zprintf(
+            zpr_sem,
+            "CLIENT: %d, loc: %d\n",
+            self.pid, self.loc
+        );
 
-    while (ctx->is_sim_running && self.loc != EXIT) {
-        // zprintf(zpr_sem, "CLIEN_Q: %zu\n", self.msgq);
-
-        if (self.loc >= self.dishes.cnt) {
-            self.loc++;
-            continue;
-        }
-
-        if (self.loc < NOF_STATIONS) {
+        if (self.loc < NOF_STATIONS)
             self.msgq = ctx->id_msg_q[self.loc];
-        }
 
         msg_dish_t msg = {
-            .mtype  = self.ticket ? 2:3,
+            .mtype  = self.loc == CHECKOUT && self.ticket ? TICKET : DEFAULT,
             .client = self.pid,
-            .dish   = {self.dishes.data[self.loc], "", 0, 0},
-            .status = 1
+            .dish   = {
+                self.loc < 3 ? self.dishes.data[self.loc] : 0,
+                "", 0, 0
+            },
+            .status = REQUEST_OK
         };
 
-        do {
-            send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
+        switch (self.loc) {
+            case FIRST_COURSE:
+            case MAIN_COURSE:
+            case COFFEE_BAR:
+                do {
+                    send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
 
-            // chiamata bloccante, sta fermo qui finche' non riceve una risposta
-            recive_msg(self.msgq, self.pid, &response);
+                    zprintf(
+                        zpr_sem,
+                        "CLIENT: %d, %d, WAITING\n",
+                        self.pid, self.msgq
+                    );
 
-            if (response.status == -1) {
-                size_t menu_size = ctx->menu[self.loc].size;
+                    // chiamata bloccante, sta fermo qui finche' non riceve una risposta
+                    recive_msg(self.msgq, self.pid, &response);
 
-                if (menu_size > 1) {
-                    size_t temp;
-                    while ((temp = (size_t)rand()%ctx->menu[self.loc].size) == msg.dish.id);
-                    msg.dish.id = temp;
-                    msg.mtype   = 1;
+                    zprintf(
+                        zpr_sem,
+                        "CLIENT: %d, SERVED\n",
+                        self.pid
+                    );
 
-                } else { break; }
-            }
+                    if (response.status == ERROR) {
+                        const size_t menu_size = ctx->menu[self.loc].size;
 
-        } while (ctx->is_sim_running && response.status == -1);
+                        if (menu_size > 1) {
+                            size_t temp;
+                            while ((temp = (size_t)rand()%menu_size) == msg.dish.id);
+                            msg.dish.id  = temp;
+                            msg.mtype    = HIGH;
 
-        // TODO: controllo se il piatto richiesto e' lo stesso di quello restituito
-        dish = response.dish;
-        
-        // zprintf(zpr_sem, "RISPOSTA: \ntype: %zu, price: %d\n\n", response.mtype, dish.price);
+                        } else { goto END; } // GOTO used because the REDIS creator uses it :)
+                    }
+
+                    // zprintf(zpr_sem, "C_INFO: %d\n", response.dish.eating_time);
+                    self.wait_time += response.dish.eating_time;
+
+                } while (ctx->is_sim_running && response.status == ERROR);
+
+                END:
+                self.dishes.data[self.loc] = msg.dish.id;
+                break;
+
+            case CHECKOUT:
+                send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
+
+                zprintf(
+                    zpr_sem,
+                    "CLIENT: %d, %d, WAITING\n",
+                    self.pid, self.loc
+                );
+
+                // chiamata bloccante, sta fermo qui finche' non riceve una risposta
+                recive_msg(self.msgq, self.pid, &response);
+
+                zprintf(
+                    zpr_sem,
+                    "CLIENT: %d, SERVED\n",
+                    self.pid
+                );
+                break;
+
+            case TABLE:
+                zprintf(
+                    zpr_sem,
+                    "CLIENT: %d, %d, EATING\n",
+                    self.pid, self.wait_time
+                );
+                znsleep(self.wait_time);
+                break;
+
+            case EXIT:
+                zprintf(
+                    zpr_sem,
+                    "CLIENT: %d, EXIT\n",
+                    self.pid
+                );
+                exit(1);
+        }
 
         self.loc++;
     }

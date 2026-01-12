@@ -6,12 +6,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
 #include <sys/sem.h>
+
+#include "const.h"
 
 // any type
 typedef       void* any; 
@@ -142,7 +144,7 @@ sem_signal(
 
 static void
 zprintf(
-    int sem_id,
+    const int   sem_id,
     const char *fmt, ...
 ) {
     va_list args;
@@ -158,5 +160,16 @@ zprintf(
     sem_signal(sem_id, 0);
 }
 
+static inline void
+znsleep(const size_t wait_time) {
+    struct timespec req;
+
+    const size_t total_ns = wait_time * N_NANO_SECS;
+
+    req.tv_sec = (time_t)(total_ns / 1000000000L);
+    req.tv_nsec = (long)(total_ns % 1000000000L);
+
+    nanosleep(&req, NULL);
+}
 
 #endif

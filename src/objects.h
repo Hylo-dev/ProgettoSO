@@ -1,18 +1,15 @@
 #ifndef _OBJECTS_H
 #define _OBJECTS_H
 
-#include <stdbool.h>
-
 #include "const.h"
 #include <stddef.h>
-#include <stdint.h>
 #include <sys/types.h>
 
 #define DISH_NAME_MAX_LEN 32
 
 // incorpora sia i tipi di stazioni sia dove puo' trovarsi un utente.
 // nel caso delle stazioni 'TABLE' e' ignorato
-typedef enum: uint8_t {
+typedef enum {
     FIRST_COURSE = 0,
     MAIN_COURSE  = 1,
     COFFEE_BAR   = 2,
@@ -50,6 +47,7 @@ typedef struct {
     location_t loc;
     bool       served;
     size_t     msgq;
+    size_t     wait_time;
     struct client_menu dishes;
 } client_t;
 
@@ -82,7 +80,7 @@ typedef struct {
 typedef struct {
     stats      stats;
     location_t type;
-    worker_t     workers[NOF_WORKERS];
+    worker_t   workers[NOF_WORKERS];
     dish_t     menu   [DISHES_COUNT];
 } station;
 
@@ -114,7 +112,7 @@ typedef struct {
     // size_t coffee_menu_size;
 
     // Message queues
-    size_t id_msg_q[NOF_STATIONS];
+    size_t id_msg_q[NOF_STATIONS + 1];
 
     struct {
         pid_t      worker;

@@ -4,10 +4,20 @@
 #include "objects.h"
 #include "tools.h"
 #include <stddef.h>
-#include <stdint.h>
 #include <sys/msg.h>
 #include <unistd.h>
 
+typedef enum {
+    HIGH    = 1,
+    TICKET  = 2,
+    DEFAULT = 3
+} priority_t;
+
+typedef enum {
+    ERROR       = -1,
+    RESPONSE_OK =  0,
+    REQUEST_OK  =  1,
+} state_t;
 
 typedef struct {
     long   mtype;  // 1: HIGH PRIORITY, 2: TICKET, 3: NORMAL USER

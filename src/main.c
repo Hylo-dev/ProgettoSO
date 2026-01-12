@@ -51,7 +51,7 @@ int main(void) {
 
     for (size_t i = 0; i < NOF_STATIONS; i++) {
         ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
-        // zprintf(zprintf_sem, "QUEUE: %zu\n", ctx->id_msg_q[i]);
+        //zprintf(zprintf_sem, "QUEUE: %zu\n", ctx->id_msg_q[i]);
     }
 
     // ----------------- GET MENU -----------------
@@ -152,6 +152,8 @@ init_worker(
     if (pid == 0) {
         ctx->roles[idx].worker = getpid();
 
+        //zprintf(atoi(zprintf_sem), "idx: %zu\n", idx);
+
         // { exec name, size_t shm_id, loc_t role, int zprt_sem, int shm_sem }
         char str_role_idx[2];
         sprintf(str_role_idx, "%zu", idx);
@@ -187,13 +189,14 @@ _compare_pair_station(
 
 void
 assign_roles(simctx_t* ctx) {
-    location_t roles_buffer[NOF_WORKERS];
+    location_t roles_buffer[NOF_WORKERS]; // TODO: Inserire controllo lavoratori < 4
     int assigned_count = 0;
 
     roles_buffer[assigned_count++] = FIRST_COURSE; // 0
     roles_buffer[assigned_count++] = MAIN_COURSE;  // 1
     roles_buffer[assigned_count++] = COFFEE_BAR;   // 2
     roles_buffer[assigned_count++] = CHECKOUT;     // 3
+
 
     struct pair_station priority_list[4] = {
         { FIRST_COURSE, AVG_SRVC_FIRST_COURSE },

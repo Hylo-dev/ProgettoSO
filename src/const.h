@@ -24,7 +24,7 @@
 
 /* =================== PROCESS COUNT =================== */
 #define NOF_WORKERS 10
-#define NOF_USERS 30
+#define NOF_USERS 1
 
 /* =================== WORKERS COUNT =================== */
 #define NOF_WK_SEATS_PRIMI 2

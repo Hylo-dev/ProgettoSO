@@ -75,6 +75,9 @@ int main(void) {
         ctx->available_dishes[COFFEE].size++;
     }
 
+    // TEMP
+    assign_roles(ctx);
+
     // CREATE WORKERS
     char str_shm_id[16];
     char str_zprintf[16];

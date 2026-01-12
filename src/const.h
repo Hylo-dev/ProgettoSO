@@ -23,7 +23,7 @@
 #define AVG_SRVC_CASSA 10
 
 /* =================== PROCESS COUNT =================== */
-#define NOF_WORKERS 5
+#define NOF_WORKERS 10
 #define NOF_USERS 30
 
 /* =================== WORKERS COUNT =================== */

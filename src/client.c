@@ -7,6 +7,7 @@
 #include "tools.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 
@@ -49,7 +50,8 @@ main(
     const int    zpr_sem =            atoi(argv[3]);
     const simctx_t *ctx  = (simctx_t*)zshmat(shmid, NULL, 0);
 
-    struct client_menu menu;
+    struct client_menu menu = {0};
+
     pick_dishes(&menu, ctx);
     
     client_t self = {
@@ -67,28 +69,46 @@ main(
     while (ctx->is_sim_running && self.loc != EXIT) {
         // zprintf(zpr_sem, "CLIEN_Q: %zu\n", self.msgq);
 
+        if (self.loc >= self.dishes.cnt) {
+            self.loc++;
+            continue;
+        }
+
         if (self.loc < NOF_STATIONS) {
             self.msgq = ctx->id_msg_q[self.loc];
         }
 
-        if (self.loc < self.dishes.cnt) {
-            const msg_dish_t msg = {
-                .mtype  = self.ticket ? 2:3,
-                .client = self.pid,
-                .dish   = {self.dishes.data[self.loc], "", 0, 0},
-                .status = 1
-            };
+        msg_dish_t msg = {
+            .mtype  = self.ticket ? 2:3,
+            .client = self.pid,
+            .dish   = {self.dishes.data[self.loc], "", 0, 0},
+            .status = 1
+        };
 
+        do {
             send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
-        }
 
-        // chiamata bloccante, sta fermo qui finche' non riceve una risposta
-        recive_msg(self.msgq, self.pid, &response);
-        
+            // chiamata bloccante, sta fermo qui finche' non riceve una risposta
+            recive_msg(self.msgq, self.pid, &response);
+
+            if (response.status == -1) {
+                size_t menu_size = ctx->menu[self.loc].size;
+
+                if (menu_size > 1) {
+                    size_t temp;
+                    while ((temp = (size_t)rand()%ctx->menu[self.loc].size) == msg.dish.id);
+                    msg.dish.id = temp;
+                    msg.mtype   = 1;
+
+                } else { break; }
+            }
+
+        } while (ctx->is_sim_running && response.status == -1);
+
         // TODO: controllo se il piatto richiesto e' lo stesso di quello restituito
         dish = response.dish;
         
-        zprintf(zpr_sem, "RISPOSTA: \ntype: %zu, price: %d\n\n", response.mtype, dish.price);
+        // zprintf(zpr_sem, "RISPOSTA: \ntype: %zu, price: %d\n\n", response.mtype, dish.price);
 
         self.loc++;
     }

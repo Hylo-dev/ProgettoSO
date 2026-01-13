@@ -6,7 +6,6 @@ A C-based project for managing a cafeteria/restaurant system with clients, worke
 
 - `src/` - Source code files
 - `test/` - Test files
-- `libds/` - External library (if present)
 - `config.json` - Configuration file
 - `menu.json` - Menu configuration
 

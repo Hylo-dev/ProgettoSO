@@ -8,6 +8,7 @@
 #include <sys/msg.h>
 #include <sys/wait.h>
 
+#include "config.h"
 #include "const.h"
 #include "objects.h"
 #include "tools.h"
@@ -29,7 +30,8 @@ sim_day(simctx_t* ctx);
 void
 assign_roles(simctx_t* ctx);
 
-int main(void) {
+int
+main(void) {
 
     const int zprintf_sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
     semctl(zprintf_sem, 0, SETVAL, 1);
@@ -56,6 +58,7 @@ int main(void) {
 
     // ----------------- GET MENU -----------------
     load_menu("menu.json", ctx);
+    load_config("config.json", &ctx->config);
 
     for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {
         ctx->available_dishes[MAIN].elements[i].id = ctx->menu[MAIN].elements[i].id;
@@ -118,9 +121,11 @@ init_client(
     const pid_t pid = zfork();
 
     if (pid == 0) {
-        /* { exec name,
+        /* {
+             exec name,
              bool ticket,
-             shmid for the menu
+             shmid for the menu,
+             zprintf_sem
            }
          */
         char *args[] = {
@@ -141,8 +146,8 @@ init_client(
 
 void
 init_worker(
-    simctx_t *ctx,
-    char     *shm_id, 
+    simctx_t* ctx,
+    char*     shm_id, 
     size_t    idx,
     char*     zprintf_sem,
     char*     shm_sem
@@ -169,9 +174,6 @@ init_worker(
 
         panic("ERROR: Execve failed for worker n. %zu\n", idx);
     }
-
-    // NOTE: REMOVE THIS LATER
-    // wait(NULL);
 }
 
 /* ========================== SUPPORT ========================== */ 

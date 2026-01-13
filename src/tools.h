@@ -172,4 +172,25 @@ znsleep(const size_t wait_time) {
     nanosleep(&req, NULL);
 }
 
+
+/* ===================== FILES ===================== */
+
+static inline FILE*
+zfopen(const char* fname, const char* mode) {
+    FILE* file = fopen(fname, mode);
+    if (file == NULL)
+        panic("ERROR: Failed opening the file \"%s\" using the mode \"%s\"", fname, mode);
+
+    return file;
+}
+
+static inline long
+zfsize(FILE* file) {
+    long fsize;
+    fseek(file, 0, SEEK_END);
+    fsize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    return fsize;
+}
+
 #endif

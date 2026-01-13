@@ -17,20 +17,13 @@
 #define N_NANO_SECS 5 /* number of real ns for a minute in the sim */
 
 /* =================== AVERAGE TIMES =================== */
-#define AVG_SRVC_FIRST_COURSE 5
-#define AVG_SRVC_MAIN_COURSE 8
-#define AVG_SRVC_COFFEE 3
-#define AVG_SRVC_CASSA 10
-
-/* =================== PROCESS COUNT =================== */
-#define NOF_WORKERS 10
-#define NOF_USERS 1
-
-/* =================== WORKERS COUNT =================== */
-#define NOF_WK_SEATS_PRIMI 2
-#define NOF_WK_SEATS_SECONDI 2
-#define NOF_WK_SEATS_COFFEE 2
-#define NOF_WK_SEATS_CASSA 2
+static double var_srvc[] = {
+    0.5, // VAR_SRVC_FIRST_COURSE 
+    0.5, // VAR_SRVC_MAIN_COURSE 
+    0.8, // VAR_SRVC_COFFEE 
+    0.2, // VAR_SRVC_CHECKOUT 
+    0.2, // VAR_SRVC_REFILL 
+};
 
 /* ====================== SIM DATA ===================== */
 #define DISHES_COUNT 10

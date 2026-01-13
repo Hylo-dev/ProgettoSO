@@ -35,8 +35,6 @@ typedef struct {
     size_t     pause_time;  // cumulative time spent on pause
 } worker_t;
 
-
-
 struct client_menu {
     size_t cnt;
     size_t data[MAX_DISHES];
@@ -79,15 +77,23 @@ typedef struct {
 } stats;
 
 typedef struct {
+    pid_t      worker;
+    location_t role;
+} worker_role_t;
+
+typedef struct {
     stats      stats;
     location_t type;
-    worker_t   workers[NOF_WORKERS];
-    dish_t     menu   [DISHES_COUNT];
+    
+    int        shmid_workers; 
+    worker_t   *workers;
+    
+    dish_t     menu[DISHES_COUNT];
 } station;
 
 typedef struct {
     stats  global_stats;
-    conf_t config;
+    conf_t config; 
 
     // Read && Write
     struct {
@@ -101,18 +107,13 @@ typedef struct {
         size_t size;
     } menu[3];
 
-    // Message queues
     size_t id_msg_q[NOF_STATIONS + 1];
 
-    struct {
-        pid_t      worker;
-        location_t role;
-    } roles[NOF_WORKERS];
+    int            shmid_roles;
+    worker_role_t  *roles;
 
     bool is_sim_running;
 
 } simctx_t;
-
-
 
 #endif

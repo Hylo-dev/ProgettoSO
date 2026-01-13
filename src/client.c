@@ -48,6 +48,10 @@ main(
     const size_t shmid   = (size_t)   atoi(argv[2]);
     const int    zpr_sem =            atoi(argv[3]);
     const simctx_t *ctx  = (simctx_t*)zshmat(shmid, NULL, 0);
+   
+    station *st = (station*)shmat(ctx->shmid_stations, NULL, 0);
+
+    st->workers = (worker_t*)shmat(st->shmid_workers, NULL, 0);
 
     struct client_menu menu = {0};
 

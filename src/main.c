@@ -151,7 +151,7 @@ init_ctx(
     memset(ctx, 0, sizeof(simctx_t));
     ctx->is_sim_running = true;
 
-    load_config("config.json", &ctx->config);
+    load_config("data/config.json", &ctx->config);
 
     size_t roles_size = sizeof(worker_role_t) * ctx->config.nof_workers;
     
@@ -168,7 +168,7 @@ init_ctx(
     }
 
     // 6. Caricamento Menu
-    load_menu("menu.json", ctx);
+    load_menu("data/menu.json", ctx);
 
     // Inizializzazione piatti disponibili (Logica invariata)
     for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {

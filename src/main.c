@@ -15,14 +15,14 @@
 #include "tools.h"
 #include "menu.h"
 
-#define for_in(from, to) \
-    for (size_t i = from; i < (size_t)to; i++)
+#define for_in(decl, to) \
+            for (size_t decl; i < (size_t)to; i++)
 
 #define SHM_RW 0666
 
 /* Prototipi */
 void init_client(char*, char*);
-void init_worker(simctx_t*, char*, size_t, char*, char*);
+void init_worker(simctx_t*, char*, size_t, char*, char*, char*);
 void sim_day(simctx_t* ctx);
 void assign_roles(simctx_t* ctx);
 simctx_t* init_ctx(const size_t);
@@ -57,21 +57,38 @@ main(void) {
 
     simctx_t* ctx = init_ctx(shm_id);
 
+    const size_t
+    shm_stations_id = zshmget(IPC_PRIVATE, sizeof(station) * NOF_STATIONS, IPC_CREAT | SHM_RW);
+
+    station *st = (station*)zshmat(shm_stations_id, NULL, 0);
+    memset(st, NOF_STATIONS, sizeof(station));
+    for_in(i = 0, NOF_STATIONS) {
+        size_t nworkers = *(&ctx->config.nof_wk_seats_primi + 4 * (int)i);
+        st[i].shmid_workers = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
+        st[i].type = (location_t)i;
+
+        for_in(j = 0, ctx->menu[i].size) {
+            st[i].menu[j] = ctx->menu[i].elements[j];
+        }
+    }
+
     char sshm_id [16];
+    char sshm_st [16];
     char sout_sem[16];
     char sshm_sem[16];
 
     sprintf(sshm_id,  "%zu", shm_id );
+    sprintf(sshm_st,  "%zu", shm_stations_id);
     sprintf(sout_sem, "%d" , out_sem);
     sprintf(sshm_sem, "%d" , shm_sem);
 
-    for_in(0, ctx->config.nof_workers)
-        init_worker(ctx, sshm_id, i, sout_sem, sshm_sem);
+    for_in(i = 0, ctx->config.nof_workers)
+        init_worker(ctx, sshm_id, i, sout_sem, sshm_sem, sshm_st);
 
-    for_in(0, ctx->config.nof_users)
+    for_in(i = 0, ctx->config.nof_users)
         init_client(sshm_id, sout_sem);
     
-    for_in(0, ctx->config.sim_duration)
+    for_in(i = 0, ctx->config.sim_duration)
         sim_day(ctx);
 
     while(wait(NULL) > 0);
@@ -80,7 +97,7 @@ main(void) {
     shmctl(ctx->shmid_roles, IPC_RMID, NULL);
     semctl(out_sem, 0, IPC_RMID);
     semctl(shm_sem, 0, IPC_RMID);
-    for_in(0, NOF_STATIONS) msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
+    for_in(i=0, NOF_STATIONS) msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
 
     return 0;
 }
@@ -115,7 +132,8 @@ void init_worker(
     char*     shm_id,
     size_t    idx,
     char*     zprintf_sem,
-    char*     shm_sem
+    char*     shm_sem,
+    char*     stations_id
 ) {
     const pid_t pid = zfork();
 
@@ -131,6 +149,7 @@ void init_worker(
             str_role_idx,
             zprintf_sem,
             shm_sem,
+            stations_id,
             NULL 
         };
 
@@ -211,8 +230,10 @@ assign_roles(
         roles_buffer[assigned_count++] = MAIN_COURSE;  // 1
         roles_buffer[assigned_count++] = COFFEE_BAR;   // 2
         roles_buffer[assigned_count++] = CHECKOUT;     // 3
+        
     } else {
-        for(int i=0; i<num_workers; i++) roles_buffer[assigned_count++] = (location_t)i;
+        for_in(i=0, num_workers)
+            roles_buffer[assigned_count++] = (location_t)i;
     }
 
     struct pair_station priority_list[4] = {

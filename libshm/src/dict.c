@@ -4,6 +4,7 @@
  */
 
 #include "dict.h"
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -27,7 +28,7 @@
 
 // --- HELPER DI INDIRIZZAMENTO ---
 
-inline void*
+static inline void*
 resolve(void *base, uintptr_t off) {
     if (off == SHM_NULL) return NULL;
     return (char*)base + off;
@@ -73,7 +74,7 @@ unlock(int semid) {
 // --- ALLOCATORE ---
 
 static uintptr_t
-_shm_alloc_internal(shm_header *root, size_t size) {
+_shmalloc(shm_header *root, size_t size) {
     size_t current = root->heap_top;
     size_t padding = (ALIGNMENT - (current % ALIGNMENT)) % ALIGNMENT;
     size_t aligned_start = current + padding;
@@ -88,9 +89,12 @@ _shm_alloc_internal(shm_header *root, size_t size) {
 }
 
 uintptr_t
-shm_alloc_bytes(DictHandle *h, size_t size) {
+shm_alloc_bytes(
+    DictHandle *h,
+    size_t      size
+) {
     lock(h->header->sem_id);
-    uintptr_t off = _shm_alloc_internal(h->header, size);
+    uintptr_t off = _shmalloc(h->header, size);
     unlock(h->header->sem_id);
     return off;
 }
@@ -101,6 +105,24 @@ shm_ptr(DictHandle *h, uintptr_t off) {
 }
 
 // --- CORE LOGIC ---
+
+static inline void
+_rehashing_array_init(
+    DictHandle *h,
+    size_t      size
+) {
+
+    shm_header *header    = h->header;
+    uintptr_t   new_arr   = _shmalloc(header, size * sizeof(DictNode));
+        
+    if (new_arr != SHM_NULL) {
+        memset(resolve(h->base_addr, new_arr), 0, size * sizeof(DictNode));
+            
+        header->array[1]     = (array){new_arr, size, 0};
+        header->rehashing    = true;
+        header->rehash_index = 0;
+    }
+}
 
 static inline uintptr_t
 _dict_search(DictHandle *h, array *array, uintptr_t key) {
@@ -216,6 +238,26 @@ _dict_insert_blind(DictHandle *h, array *array, DictNode element) {
     } while (i < array->size);
 }
 
+static inline void
+_dict_shrink(DictHandle *h) {
+
+    array a = h->header->array[0];
+    
+    const size_t current_size = a.size;
+    const size_t threshold    = (size_t)((double)current_size * RANGE_SHRINK);
+
+    if (unlikely(!h->header->rehashing &&
+        current_size > MIN_SIZE &&
+        a.count < threshold)
+    ) {
+        size_t new_size = current_size / 2;
+        if (unlikely(new_size < MIN_SIZE)) new_size = MIN_SIZE;
+
+        _rehashing_array_init(h, new_size);
+    }
+}
+
+
 static inline void dict_rehash_table(DictHandle *h) {
     shm_header *header = h->header;
     size_t moved = 0;
@@ -272,7 +314,7 @@ bool shm_dict_init(void *shm_base, size_t total_shm_size) {
     root->magic = DICT_MAGIC;
 
     // Allocazione primo array
-    uintptr_t arr_off = _shm_alloc_internal(root, MIN_SIZE * sizeof(DictNode));
+    uintptr_t arr_off = _shmalloc(root, MIN_SIZE * sizeof(DictNode));
     if (arr_off == SHM_NULL) return false;
     memset(resolve(shm_base, arr_off), 0, MIN_SIZE * sizeof(DictNode));
 
@@ -284,60 +326,70 @@ bool shm_dict_init(void *shm_base, size_t total_shm_size) {
     return true;
 }
 
-void shm_dict_attach(DictHandle *handle, void *shm_base, 
-                     size_t (*hash_fn)(uintptr_t, void*),
-                     int (*cmp_fn)(uintptr_t, uintptr_t, void*)) {
+void shm_dict_attach(
+    DictHandle  *handle,
+    void        *shm_base, 
+    size_t     (*hash_fn)(uintptr_t, void*),
+    int        (*cmp_fn) (uintptr_t, uintptr_t, void*)
+ ) {
     handle->base_addr = shm_base;
-    handle->header = (shm_header *)shm_base;
-    handle->hash = hash_fn;
-    handle->compare = cmp_fn;
-    // Il sem_id viene letto automaticamente da handle->header->sem_id
+    handle->header    = (shm_header*)shm_base;
+    handle->hash      = hash_fn;
+    handle->compare   = cmp_fn;
 }
 
 uintptr_t shm_dict_get(DictHandle *h, uintptr_t key) {
-    if (!h || !h->header) return SHM_NULL;
+    if (unlikely(!h || !h->header)) return SHM_NULL;
     
     lock(h->header->sem_id);
-    
     if (h->header->rehashing) dict_rehash_table(h);
     
     uintptr_t res = SHM_NULL;
     if (h->header->rehashing) res = _dict_search(h, &h->header->array[1], key);
-    if (res == SHM_NULL) res = _dict_search(h, &h->header->array[0], key);
+    if (res == SHM_NULL)      res = _dict_search(h, &h->header->array[0], key);
     
     unlock(h->header->sem_id);
     return res;
 }
 
-bool shm_dict_set(DictHandle *h, uintptr_t key, uintptr_t value) {
-    if (!h || !h->header) return false;
+bool shm_dict_set(
+    DictHandle *h,
+    uintptr_t   key,
+    uintptr_t   value
+) {
+    if (unlikely(!h || !h->header)) return false;
     
     lock(h->header->sem_id);
     shm_header *header = h->header;
 
     if (header->rehashing) {
         dict_rehash_table(h);
+        
     } else if (header->array[0].count >= (size_t)(header->array[0].size * RANGE_RESIZE)) {
-        size_t new_size = header->array[0].size * 2;
-        uintptr_t new_arr = _shm_alloc_internal(header, new_size * sizeof(DictNode));
+        const size_t new_size = header->array[0].size * 2;
+        uintptr_t new_arr     = _shmalloc(header, new_size * sizeof(DictNode));
+        
         if (new_arr != SHM_NULL) {
             memset(resolve(h->base_addr, new_arr), 0, new_size * sizeof(DictNode));
-            header->array[1] = (array){new_arr, new_size, 0};
-            header->rehashing = true;
+            
+            header->array[1]     = (array){new_arr, new_size, 0};
+            header->rehashing    = true;
             header->rehash_index = 0;
         }
     }
 
     bool success = false;
-    DictNode el = {key, value};
-    
+    DictNode el  = {key, value};
+
     if (header->rehashing && header->array[1].elements_off != SHM_NULL) {
         DictResult res = _dict_insert(h, &header->array[1], el);
+        
         if (res != DICT_ERR) {
             if (res == DICT_ADDED) header->array[1].count++;
             _dict_change_state(h, &header->array[0], key, NODE_DELETED);
             success = true;
         }
+        
     } else {
         DictResult res = _dict_insert(h, &header->array[0], el);
         if (res != DICT_ERR) {
@@ -351,22 +403,30 @@ bool shm_dict_set(DictHandle *h, uintptr_t key, uintptr_t value) {
 }
 
 bool shm_dict_remove(DictHandle *h, uintptr_t key) {
-    if (!h || !h->header) return false;
+    if (unlikely(!h || !h->header)) return false;
     lock(h->header->sem_id);
-    
-    bool removed = false;
+
+    bool ret = false;
     if (h->header->rehashing) {
         dict_rehash_table(h);
+        
         if (_dict_change_state(h, &h->header->array[1], key, NODE_DELETED)) {
             h->header->array[1].count--;
-            removed = true;
+            ret = true;      
         }
     }
-    if (!removed && _dict_change_state(h, &h->header->array[0], key, NODE_DELETED)) {
+    
+    if (!ret && _dict_change_state(h, &h->header->array[0], key, NODE_DELETED)) {
         h->header->array[0].count--;
-        removed = true;
+        ret = true;
+    }
+
+    if (!ret) {
+        unlock(h->header->sem_id);
+        return false;
     }
     
+    _dict_shrink(h);
     unlock(h->header->sem_id);
-    return removed;
+    return true;
 }

@@ -21,14 +21,14 @@
 
 #define STATE_MASK 0x7ULL
 #define PTR_MASK   (~STATE_MASK)
-#define GET_KEY_OFFSET(tagged) ((shm_offset_t)((tagged) & PTR_MASK))
+#define GET_KEY_OFFSET(tagged) ((uintptr_t)((tagged) & PTR_MASK))
 #define GET_STATE(tagged)      ((NodeState)((tagged) & STATE_MASK))
-#define TAG_OFFSET(off, state) ((shm_offset_t)((off) | (state)))
+#define TAG_OFFSET(off, state) ((uintptr_t)((off) | (state)))
 
 // --- HELPER DI INDIRIZZAMENTO ---
 
 inline void*
-resolve(void *base, shm_offset_t off) {
+resolve(void *base, uintptr_t off) {
     if (off == SHM_NULL) return NULL;
     return (char*)base + off;
 }
@@ -72,8 +72,8 @@ unlock(int semid) {
 
 // --- ALLOCATORE ---
 
-static shm_offset_t
-_shm_alloc_internal(ShmRoot *root, size_t size) {
+static uintptr_t
+_shm_alloc_internal(shm_header *root, size_t size) {
     size_t current = root->heap_top;
     size_t padding = (ALIGNMENT - (current % ALIGNMENT)) % ALIGNMENT;
     size_t aligned_start = current + padding;
@@ -84,30 +84,30 @@ _shm_alloc_internal(ShmRoot *root, size_t size) {
     }
 
     root->heap_top = new_top;
-    return (shm_offset_t)aligned_start;
+    return (uintptr_t)aligned_start;
 }
 
-shm_offset_t
+uintptr_t
 shm_alloc_bytes(DictHandle *h, size_t size) {
-    lock(h->root->sem_id);
-    shm_offset_t off = _shm_alloc_internal(h->root, size);
-    unlock(h->root->sem_id);
+    lock(h->header->sem_id);
+    uintptr_t off = _shm_alloc_internal(h->header, size);
+    unlock(h->header->sem_id);
     return off;
 }
 
 void*
-shm_ptr(DictHandle *h, shm_offset_t off) {
+shm_ptr(DictHandle *h, uintptr_t off) {
     return resolve(h->base_addr, off);
 }
 
 // --- CORE LOGIC ---
 
-static inline shm_offset_t
-_dict_search(DictHandle *h, ShmArray *array, shm_offset_t key) {
+static inline uintptr_t
+_dict_search(DictHandle *h, array *array, uintptr_t key) {
     if (unlikely(array->size == 0 || array->elements_off == SHM_NULL))
         return SHM_NULL;
     
-    struct ShmDictElement *elements = (struct ShmDictElement *)resolve(h->base_addr, array->elements_off);
+    DictNode *elements = (DictNode *)resolve(h->base_addr, array->elements_off);
     const size_t hash_value = h->hash(key, h->base_addr);
     size_t index = hash_value & (array->size - 1);
     size_t i = 0;
@@ -116,13 +116,13 @@ _dict_search(DictHandle *h, ShmArray *array, shm_offset_t key) {
         size_t next_index = (i < 32) ? (index + (i+1)*(i+1)) & (array->size - 1) 
                                      : (index + (i+1)) & (array->size - 1);
         
-        shm_offset_t raw_tagged = elements[index].key;
+        uintptr_t raw_tagged = elements[index].key;
         NodeState state = GET_STATE(raw_tagged);
         if (unlikely(state == NODE_EMPTY)) return SHM_NULL;
         
-        shm_offset_t current_key = GET_KEY_OFFSET(raw_tagged);
+        uintptr_t current_key = GET_KEY_OFFSET(raw_tagged);
         if (likely(state == NODE_USED && h->compare(key, current_key, h->base_addr) == 0)) {
-            return elements[index].data;
+            return elements[index].val;
         }
         index = next_index;
         i++;
@@ -133,12 +133,12 @@ _dict_search(DictHandle *h, ShmArray *array, shm_offset_t key) {
 static inline bool
 _dict_change_state(
     DictHandle *h,
-    ShmArray *array,
-    shm_offset_t key,
+    array *array,
+    uintptr_t key,
     NodeState new_state
 ) {
     if (unlikely(array->size == 0)) return false;
-    struct ShmDictElement *elements = (struct ShmDictElement *)resolve(h->base_addr, array->elements_off);
+    DictNode *elements = (DictNode *)resolve(h->base_addr, array->elements_off);
     const size_t hash_value = h->hash(key, h->base_addr);
     size_t index = hash_value & (array->size - 1);
     size_t i = 0;
@@ -146,7 +146,7 @@ _dict_change_state(
         size_t next_index = (i < 32) ?
                             (index + (i+1)*(i+1)) & (array->size - 1) :
                             (index + i + 1) & (array->size - 1);
-        shm_offset_t raw_tagged = elements[index].key;
+        uintptr_t raw_tagged = elements[index].key;
         NodeState state = GET_STATE(raw_tagged);
         if (state == NODE_EMPTY) return false;
         if (state == NODE_USED && h->compare(key, GET_KEY_OFFSET(raw_tagged), h->base_addr) == 0) {
@@ -162,28 +162,28 @@ _dict_change_state(
 static inline DictResult
 _dict_insert(
     DictHandle *h,
-    ShmArray *array,
-    struct ShmDictElement element
+    array *array,
+    DictNode element
 ) {
     if (unlikely(array->elements_off == SHM_NULL)) return DICT_ERR;
-    struct ShmDictElement *elements = (struct ShmDictElement *)resolve(h->base_addr, array->elements_off);
+    DictNode *elements = (DictNode *)resolve(h->base_addr, array->elements_off);
     ssize_t best_position = -1;
     const size_t hash_value = h->hash(element.key, h->base_addr);
     size_t index = hash_value & (array->size - 1);
     size_t i = 0;
     do {
         size_t next_index = (i < 32) ? (index + (i+1)*(i+1)) & (array->size - 1) : (index + i + 1) & (array->size - 1);
-        shm_offset_t raw_tagged = elements[index].key;
+        uintptr_t raw_tagged = elements[index].key;
         NodeState state = GET_STATE(raw_tagged);
         if (state == NODE_EMPTY) {
             if (best_position == -1) best_position = index;
             elements[best_position].key = TAG_OFFSET(element.key, NODE_USED);
-            elements[best_position].data = element.data;
+            elements[best_position].val = element.val;
             return DICT_ADDED;
         }
         if (state == NODE_USED && h->compare(element.key, GET_KEY_OFFSET(raw_tagged), h->base_addr) == 0) {
             elements[index].key = TAG_OFFSET(element.key, NODE_USED);
-            elements[index].data = element.data;
+            elements[index].val = element.val;
             return DICT_UPDATED;
         }
         if (state == NODE_DELETED && best_position == -1) best_position = index;
@@ -192,23 +192,23 @@ _dict_insert(
     } while (i < array->size);
     if (best_position != -1) {
         elements[best_position].key = TAG_OFFSET(element.key, NODE_USED);
-        elements[best_position].data = element.data;
+        elements[best_position].val = element.val;
         return DICT_ADDED;
     }
     return DICT_ERR;
 }
 
 static inline void
-_dict_insert_blind(DictHandle *h, ShmArray *array, struct ShmDictElement element) {
-    struct ShmDictElement *elements = (struct ShmDictElement *)resolve(h->base_addr, array->elements_off);
+_dict_insert_blind(DictHandle *h, array *array, DictNode element) {
+    DictNode *elements = (DictNode *)resolve(h->base_addr, array->elements_off);
     size_t index = h->hash(element.key, h->base_addr) & (array->size - 1);
     size_t i = 0;
     do {
         size_t next_index = (i < 32) ? (index + (i+1)*(i+1)) & (array->size - 1) : (index + i + 1) & (array->size - 1);
         if (GET_STATE(elements[index].key) == NODE_EMPTY) {
             elements[index].key = TAG_OFFSET(element.key, NODE_USED);
-            elements[index].data = element.data;
-            array->num_elements++;
+            elements[index].val = element.val;
+            array->count++;
             return;
         }
         index = next_index;
@@ -217,26 +217,26 @@ _dict_insert_blind(DictHandle *h, ShmArray *array, struct ShmDictElement element
 }
 
 static inline void dict_rehash_table(DictHandle *h) {
-    ShmRoot *root = h->root;
+    shm_header *header = h->header;
     size_t moved = 0;
-    struct ShmDictElement *old_elems = (struct ShmDictElement *)resolve(h->base_addr, root->array[0].elements_off);
+    DictNode *old_elems = (DictNode *)resolve(h->base_addr, header->array[0].elements_off);
     
-    while (root->rehash_index < root->array[0].size && moved < 100) {
-        struct ShmDictElement *el = &old_elems[root->rehash_index];
+    while (header->rehash_index < header->array[0].size && moved < 100) {
+        DictNode *el = &old_elems[header->rehash_index];
         if (GET_STATE(el->key) == NODE_USED) {
-            shm_offset_t clean = GET_KEY_OFFSET(el->key);
-            _dict_insert_blind(h, &root->array[1], (struct ShmDictElement){clean, el->data});
+            uintptr_t clean = GET_KEY_OFFSET(el->key);
+            _dict_insert_blind(h, &header->array[1], (DictNode){clean, el->val});
             el->key = TAG_OFFSET(clean, NODE_DELETED);
-            root->array[0].num_elements--;
+            header->array[0].count--;
             moved++;
         }
-        root->rehash_index++;
+        header->rehash_index++;
     }
-    if (root->array[0].num_elements == 0) {
-        root->array[0] = root->array[1];
-        root->array[1] = (ShmArray){SHM_NULL, 0, 0};
-        root->is_rehashing = false;
-        root->rehash_index = 0;
+    if (header->array[0].count == 0) {
+        header->array[0] = header->array[1];
+        header->array[1] = (array){SHM_NULL, 0, 0};
+        header->rehashing = false;
+        header->rehash_index = 0;
     }
 }
 
@@ -244,7 +244,7 @@ static inline void dict_rehash_table(DictHandle *h) {
 
 bool shm_dict_init(void *shm_base, size_t total_shm_size) {
     if (!shm_base) return false;
-    ShmRoot *root = (ShmRoot *)shm_base;
+    shm_header *root = (shm_header *)shm_base;
 
     // CREAZIONE SEMAFORO SYSV
     // Usiamo IPC_PRIVATE perché salviamo l'ID nella memoria condivisa accessibile a tutti
@@ -265,108 +265,108 @@ bool shm_dict_init(void *shm_base, size_t total_shm_size) {
     // Setup Root
     root->sem_id = semid; // Salviamo l'ID così gli altri processi lo trovano
     
-    size_t root_size = sizeof(ShmRoot);
+    size_t root_size = sizeof(shm_header);
     size_t heap_start = (root_size + 63) & ~63;
     root->heap_top = heap_start;
     root->total_capacity = total_shm_size;
     root->magic = DICT_MAGIC;
 
     // Allocazione primo array
-    shm_offset_t arr_off = _shm_alloc_internal(root, MIN_SIZE * sizeof(struct ShmDictElement));
+    uintptr_t arr_off = _shm_alloc_internal(root, MIN_SIZE * sizeof(DictNode));
     if (arr_off == SHM_NULL) return false;
-    memset(resolve(shm_base, arr_off), 0, MIN_SIZE * sizeof(struct ShmDictElement));
+    memset(resolve(shm_base, arr_off), 0, MIN_SIZE * sizeof(DictNode));
 
-    root->array[0] = (ShmArray){arr_off, MIN_SIZE, 0};
-    root->array[1] = (ShmArray){SHM_NULL, 0, 0};
-    root->is_rehashing = false;
+    root->array[0] = (array){arr_off, MIN_SIZE, 0};
+    root->array[1] = (array){SHM_NULL, 0, 0};
+    root->rehashing = false;
     root->rehash_index = 0;
 
     return true;
 }
 
 void shm_dict_attach(DictHandle *handle, void *shm_base, 
-                     size_t (*hash_fn)(shm_offset_t, void*),
-                     int (*cmp_fn)(shm_offset_t, shm_offset_t, void*)) {
+                     size_t (*hash_fn)(uintptr_t, void*),
+                     int (*cmp_fn)(uintptr_t, uintptr_t, void*)) {
     handle->base_addr = shm_base;
-    handle->root = (ShmRoot *)shm_base;
+    handle->header = (shm_header *)shm_base;
     handle->hash = hash_fn;
     handle->compare = cmp_fn;
-    // Il sem_id viene letto automaticamente da handle->root->sem_id
+    // Il sem_id viene letto automaticamente da handle->header->sem_id
 }
 
-shm_offset_t shm_dict_get(DictHandle *h, shm_offset_t key) {
-    if (!h || !h->root) return SHM_NULL;
+uintptr_t shm_dict_get(DictHandle *h, uintptr_t key) {
+    if (!h || !h->header) return SHM_NULL;
     
-    lock(h->root->sem_id);
+    lock(h->header->sem_id);
     
-    if (h->root->is_rehashing) dict_rehash_table(h);
+    if (h->header->rehashing) dict_rehash_table(h);
     
-    shm_offset_t res = SHM_NULL;
-    if (h->root->is_rehashing) res = _dict_search(h, &h->root->array[1], key);
-    if (res == SHM_NULL) res = _dict_search(h, &h->root->array[0], key);
+    uintptr_t res = SHM_NULL;
+    if (h->header->rehashing) res = _dict_search(h, &h->header->array[1], key);
+    if (res == SHM_NULL) res = _dict_search(h, &h->header->array[0], key);
     
-    unlock(h->root->sem_id);
+    unlock(h->header->sem_id);
     return res;
 }
 
-bool shm_dict_set(DictHandle *h, shm_offset_t key, shm_offset_t value) {
-    if (!h || !h->root) return false;
+bool shm_dict_set(DictHandle *h, uintptr_t key, uintptr_t value) {
+    if (!h || !h->header) return false;
     
-    lock(h->root->sem_id);
-    ShmRoot *root = h->root;
+    lock(h->header->sem_id);
+    shm_header *header = h->header;
 
-    if (root->is_rehashing) {
+    if (header->rehashing) {
         dict_rehash_table(h);
-    } else if (root->array[0].num_elements >= (size_t)(root->array[0].size * RANGE_RESIZE)) {
-        size_t new_size = root->array[0].size * 2;
-        shm_offset_t new_arr = _shm_alloc_internal(root, new_size * sizeof(struct ShmDictElement));
+    } else if (header->array[0].count >= (size_t)(header->array[0].size * RANGE_RESIZE)) {
+        size_t new_size = header->array[0].size * 2;
+        uintptr_t new_arr = _shm_alloc_internal(header, new_size * sizeof(DictNode));
         if (new_arr != SHM_NULL) {
-            memset(resolve(h->base_addr, new_arr), 0, new_size * sizeof(struct ShmDictElement));
-            root->array[1] = (ShmArray){new_arr, new_size, 0};
-            root->is_rehashing = true;
-            root->rehash_index = 0;
+            memset(resolve(h->base_addr, new_arr), 0, new_size * sizeof(DictNode));
+            header->array[1] = (array){new_arr, new_size, 0};
+            header->rehashing = true;
+            header->rehash_index = 0;
         }
     }
 
     bool success = false;
-    struct ShmDictElement el = {key, value};
+    DictNode el = {key, value};
     
-    if (root->is_rehashing && root->array[1].elements_off != SHM_NULL) {
-        DictResult res = _dict_insert(h, &root->array[1], el);
+    if (header->rehashing && header->array[1].elements_off != SHM_NULL) {
+        DictResult res = _dict_insert(h, &header->array[1], el);
         if (res != DICT_ERR) {
-            if (res == DICT_ADDED) root->array[1].num_elements++;
-            _dict_change_state(h, &root->array[0], key, NODE_DELETED);
+            if (res == DICT_ADDED) header->array[1].count++;
+            _dict_change_state(h, &header->array[0], key, NODE_DELETED);
             success = true;
         }
     } else {
-        DictResult res = _dict_insert(h, &root->array[0], el);
+        DictResult res = _dict_insert(h, &header->array[0], el);
         if (res != DICT_ERR) {
-            if (res == DICT_ADDED) root->array[0].num_elements++;
+            if (res == DICT_ADDED) header->array[0].count++;
             success = true;
         }
     }
     
-    unlock(h->root->sem_id);
+    unlock(h->header->sem_id);
     return success;
 }
 
-bool shm_dict_remove(DictHandle *h, shm_offset_t key) {
-    if (!h || !h->root) return false;
-    lock(h->root->sem_id);
+bool shm_dict_remove(DictHandle *h, uintptr_t key) {
+    if (!h || !h->header) return false;
+    lock(h->header->sem_id);
     
     bool removed = false;
-    if (h->root->is_rehashing) {
+    if (h->header->rehashing) {
         dict_rehash_table(h);
-        if (_dict_change_state(h, &h->root->array[1], key, NODE_DELETED)) {
-            h->root->array[1].num_elements--;
+        if (_dict_change_state(h, &h->header->array[1], key, NODE_DELETED)) {
+            h->header->array[1].count--;
             removed = true;
         }
     }
-    if (!removed && _dict_change_state(h, &h->root->array[0], key, NODE_DELETED)) {
-        h->root->array[0].num_elements--;
+    if (!removed && _dict_change_state(h, &h->header->array[0], key, NODE_DELETED)) {
+        h->header->array[0].count--;
         removed = true;
     }
     
-    unlock(h->root->sem_id);
+    unlock(h->header->sem_id);
     return removed;
 }

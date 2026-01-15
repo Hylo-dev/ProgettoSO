@@ -193,4 +193,9 @@ zfsize(FILE* file) {
     return fsize;
 }
 
+static inline size_t
+atos(const char* str) {
+    return (size_t)atoi(str);
+}
+
 #endif

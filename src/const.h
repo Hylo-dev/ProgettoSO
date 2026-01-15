@@ -1,5 +1,5 @@
-#ifndef __CONST_H
-#define __CONST_H
+#ifndef _CONST_H
+#define _CONST_H
 
 /* =================== CONST =================== */
 #define NOF_STATIONS 4

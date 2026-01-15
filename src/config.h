@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cJSON.h"
+#include "objects.h"
 #include "tools.h"
 
 #define PARSE_INT(json, key, field) \
@@ -16,42 +17,6 @@
             panic("ERROR: Unknown config format, around key: %s\n", key); \
     } while(0)
     
-typedef struct {
-    // Simulazione
-    int sim_duration;
-    int n_nano_secs;
-    int overload_threshold;
-
-    // Popolazione
-    int nof_workers;
-    int nof_users;
-    int max_users_per_group;
-    int nof_pause;
-
-    // Tempi di servizio (AVG)
-    int avg_srvc_primi;
-    int avg_srvc_main_course;
-    int avg_srvc_coffee;
-    int avg_srvc_cassa;
-
-    // Capacità (Posti)
-    int nof_wk_seats_primi;
-    int nof_wk_seats_secondi;
-    int nof_wk_seats_coffee;
-    int nof_wk_seats_cassa;
-    int nof_table_seats;
-
-    // Logistica Cibo & Versione Completa
-    int avg_refill_primi;
-    int avg_refill_secondi;
-    int max_porzioni_primi;
-    int max_porzioni_secondi;
-    int avg_refill_time;
-    int stop_duration;
-    int n_new_users;
-
-} conf_t;
-
 
 static void
 load_config(
@@ -92,33 +57,33 @@ load_config(
     }
 
     // 5. Estrazione Valori usando la Macro
-    PARSE_INT(json, "SIM_DURATION", sim_duration);
-    PARSE_INT(json, "N_NANO_SECS", n_nano_secs);
-    PARSE_INT(json, "OVERLOAD_THRESHOLD", overload_threshold);
+    PARSE_INT(json, "SIM_DURATION",         sim_duration);
+    PARSE_INT(json, "N_NANO_SECS",          n_nano_secs);
+    PARSE_INT(json, "OVERLOAD_THRESHOLD",   overload_threshold);
     
-    PARSE_INT(json, "NOF_WORKERS", nof_workers);
-    PARSE_INT(json, "NOF_USERS", nof_users);
-    PARSE_INT(json, "MAX_USERS_PER_GROUP", max_users_per_group);
-    PARSE_INT(json, "NOF_PAUSE", nof_pause);
+    PARSE_INT(json, "NOF_WORKERS",          nof_workers);
+    PARSE_INT(json, "NOF_USERS",            nof_users);
+    PARSE_INT(json, "MAX_USERS_PER_GROUP",  max_users_per_group);
+    PARSE_INT(json, "NOF_PAUSE",            nof_pause);
 
-    PARSE_INT(json, "AVG_SRVC_PRIMI", avg_srvc_primi);
-    PARSE_INT(json, "AVG_SRVC_MAIN_COURSE", avg_srvc_main_course);
-    PARSE_INT(json, "AVG_SRVC_COFFEE", avg_srvc_coffee);
-    PARSE_INT(json, "AVG_SRVC_CASSA", avg_srvc_cassa);
+    PARSE_INT(json, "AVG_SRVC_PRIMI",       avg_srvc[FIRST_COURSE]);
+    PARSE_INT(json, "AVG_SRVC_MAIN_COURSE", avg_srvc[MAIN_COURSE]);
+    PARSE_INT(json, "AVG_SRVC_COFFEE",      avg_srvc[COFFEE_BAR]);
+    PARSE_INT(json, "AVG_SRVC_CASSA",       avg_srvc[CHECKOUT]);
 
-    PARSE_INT(json, "NOF_WK_SEATS_PRIMI", nof_wk_seats_primi);
-    PARSE_INT(json, "NOF_WK_SEATS_SECONDI", nof_wk_seats_secondi);
-    PARSE_INT(json, "NOF_WK_SEATS_COFFEE", nof_wk_seats_coffee);
-    PARSE_INT(json, "NOF_WK_SEATS_CASSA", nof_wk_seats_cassa);
-    PARSE_INT(json, "NOF_TABLE_SEATS", nof_table_seats);
+    PARSE_INT(json, "NOF_WK_SEATS_PRIMI",   nof_wk_seats[FIRST_COURSE]);
+    PARSE_INT(json, "NOF_WK_SEATS_SECONDI", nof_wk_seats[MAIN_COURSE]);
+    PARSE_INT(json, "NOF_WK_SEATS_COFFEE",  nof_wk_seats[COFFEE_BAR]);
+    PARSE_INT(json, "NOF_WK_SEATS_CASSA",   nof_wk_seats[CHECKOUT]);
+    PARSE_INT(json, "NOF_TABLE_SEATS",      nof_wk_seats[TABLE]);
 
-    PARSE_INT(json, "AVG_REFILL_PRIMI", avg_refill_primi);
-    PARSE_INT(json, "AVG_REFILL_SECONDI", avg_refill_secondi);
-    PARSE_INT(json, "MAX_PORZIONI_PRIMI", max_porzioni_primi);
-    PARSE_INT(json, "MAX_PORZIONI_SECONDI", max_porzioni_secondi);
-    PARSE_INT(json, "AVG_REFILL_TIME", avg_refill_time);
-    PARSE_INT(json, "STOP_DURATION", stop_duration);
-    PARSE_INT(json, "N_NEW_USERS", n_new_users);
+    PARSE_INT(json, "AVG_REFILL_PRIMI",     avg_refill[FIRST_COURSE]);
+    PARSE_INT(json, "AVG_REFILL_SECONDI",   avg_refill[MAIN_COURSE]);
+    PARSE_INT(json, "MAX_PORZIONI_PRIMI",   max_porzioni[FIRST_COURSE]);
+    PARSE_INT(json, "MAX_PORZIONI_SECONDI", max_porzioni[MAIN_COURSE]);
+    PARSE_INT(json, "AVG_REFILL_TIME",      avg_refill_time);
+    PARSE_INT(json, "STOP_DURATION",        stop_duration);
+    PARSE_INT(json, "N_NEW_USERS",          n_new_users);
 
     // 6. Pulizia
     cJSON_Delete(json);

@@ -1,7 +1,6 @@
 #ifndef _OBJECTS_H
 #define _OBJECTS_H
 
-#include "config.h"
 #include "const.h"
 #include <stddef.h>
 #include <stdbool.h>
@@ -29,7 +28,7 @@ typedef struct {
     pid_t      pid;
     bool       active;
 
-    location_t curr_role;
+    location_t role;
     size_t     queue;
 
     size_t     pause_time;  // cumulative time spent on pause
@@ -82,21 +81,64 @@ typedef struct {
 } worker_role_t;
 
 typedef struct {
+    int        sem;
     stats      stats;
     location_t type;
-    
-    int        shmid_workers; 
-    worker_t   *workers;
+
+    struct {    
+        int shmid;
+        int cnt;
+    } wk_data;
     
     dish_t     menu[DISHES_COUNT];
 } station;
+
+typedef struct {
+    // Simulazione
+    int sim_duration;
+    int n_nano_secs;
+    int overload_threshold;
+
+    // Popolazione
+    int nof_workers;
+    int nof_users;
+    int max_users_per_group;
+    int nof_pause;
+
+    // Tempi di servizio (AVG)
+    int avg_srvc[4];
+    // primi;
+    // main_course;
+    // coffee;
+    // cassa;
+
+    // Capacità (Posti)
+    int nof_wk_seats[5];
+    // primi;
+    // main;
+    // coffee;
+    // cassa;
+    // seats;
+
+    // Logistica Cibo & Versione Completa
+    int avg_refill[2];
+    // primi;
+    // secondi;
+    int max_porzioni[2];
+    // primi;
+    // secondi;
+    int avg_refill_time;
+    int stop_duration;
+    int n_new_users;
+
+} conf_t;
 
 typedef struct {
     stats  global_stats;
     conf_t config; 
 
     // Read && Write
-    struct {
+    struct available_dishes {
         dish_available_t elements[MAX_ELEMENTS];
         size_t size;
     } available_dishes[3];

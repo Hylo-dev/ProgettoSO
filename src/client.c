@@ -2,6 +2,7 @@
  * The process is lauched by main.c with init_client
  */
 
+#include "const.h"
 #include "msg.h"
 #include "objects.h"
 #include "tools.h"
@@ -41,17 +42,14 @@ main(
 ) {
     // argv must be:
     // { exec name, bool ticket, shmid for the menu, zprint_sem }
-    if (argc != 4)
+    if (argc != 3)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
-    const bool   ticket  = (bool)     atoi(argv[1]);
-    const size_t shmid   = (size_t)   atoi(argv[2]);
-    const int    zpr_sem =            atoi(argv[3]);
+    const bool   ticket     = (bool)  atoi(argv[1]);
+    const size_t shmid      = (size_t)atoi(argv[2]);
+    const int    zpr_sem    =         atoi(argv[3]);
+    
     const simctx_t *ctx  = (simctx_t*)zshmat(shmid, NULL, 0);
-   
-    station *st = (station*)shmat(ctx->shmid_stations, NULL, 0);
-
-    st->workers = (worker_t*)shmat(st->shmid_workers, NULL, 0);
 
     struct client_menu menu = {0};
 
@@ -80,7 +78,11 @@ main(
             self.msgq = ctx->id_msg_q[self.loc];
 
         msg_dish_t msg = {
-            .mtype  = self.loc == CHECKOUT && self.ticket ? TICKET : DEFAULT,
+            /* l'mtype contiene:
+             * la priorita' della richiesta se e' il cliente a mandarlo;
+             * il pid del cliente se e' una riposta da parte del worker */
+            .mtype  = (self.loc == CHECKOUT && self.ticket)?
+                        TICKET : DEFAULT,
             .client = self.pid,
             .dish   = {
                 self.loc < 3 ? self.dishes.data[self.loc] : 0,
@@ -94,7 +96,11 @@ main(
             case MAIN_COURSE:
             case COFFEE_BAR:
                 do {
-                    send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
+                    send_msg(
+                             self.msgq,
+                             msg,
+                             sizeof(msg_dish_t)-sizeof(long)
+                    );
 
                     zprintf(
                         zpr_sem,

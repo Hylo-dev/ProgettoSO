@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,9 +68,8 @@ main(void) {
         st[i].shmid_workers = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
         st[i].type = (location_t)i;
 
-        for_in(j = 0, ctx->menu[i].size) {
+        for_in(j = 0, ctx->menu[i].size) 
             st[i].menu[j] = ctx->menu[i].elements[j];
-        }
     }
 
     char sshm_id [16];
@@ -90,6 +90,34 @@ main(void) {
     
     for_in(i = 0, ctx->config.sim_duration)
         sim_day(ctx);
+
+    while (ctx->is_sim_running) {
+
+        znsleep(600);
+
+        if (!ctx->is_sim_running) break;
+
+        sem_wait(shm_sem, 0);
+
+        for (size_t loc_idx = 0; loc_idx < 2; loc_idx++) {
+            dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
+            size_t            size_avl = ctx->available_dishes[loc_idx].size;
+            size_t            max      = loc_idx == 0 ? ctx->config.max_porzioni_primi :
+                                                        ctx->config.max_porzioni_secondi;
+            size_t            refill   = loc_idx == 0 ? ctx->config.avg_refill_primi :
+                                                        ctx->config.avg_refill_secondi;
+            for (size_t j = 0; j < size_avl; j++) {
+                size_t* qty = &elem_avl[j].quantity;
+
+                *qty += refill;
+                if (*qty > max) *qty = max;
+            }
+            
+        }
+
+        sem_signal(shm_sem, 0);
+    }
+
 
     while(wait(NULL) > 0);
 
@@ -192,19 +220,19 @@ init_ctx(
     // Inizializzazione piatti disponibili (Logica invariata)
     for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {
         ctx->available_dishes[MAIN].elements[i].id = ctx->menu[MAIN].elements[i].id;
-        ctx->available_dishes[MAIN].elements[i].quantity = 100; // O usa config.max_porzioni...
+        ctx->available_dishes[MAIN].elements[i].quantity = ctx->config.avg_refill_primi;
         ctx->available_dishes[MAIN].size++;
     }
 
     for (size_t i = 0; i < ctx->menu[FIRST].size; i++) {
         ctx->available_dishes[FIRST].elements[i].id = ctx->menu[FIRST].elements[i].id;
-        ctx->available_dishes[FIRST].elements[i].quantity = 100;
+        ctx->available_dishes[FIRST].elements[i].quantity = ctx->config.avg_refill_secondi;
         ctx->available_dishes[FIRST].size++;
     }
 
     for (size_t i = 0; i < ctx->menu[COFFEE].size; i++) {
         ctx->available_dishes[COFFEE].elements[i].id = ctx->menu[COFFEE].elements[i].id;
-        ctx->available_dishes[COFFEE].elements[i].quantity = 100;
+        ctx->available_dishes[COFFEE].elements[i].quantity = SIZE_MAX;
         ctx->available_dishes[COFFEE].size++;
     }
 

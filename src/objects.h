@@ -35,8 +35,8 @@ typedef struct {
 } worker_t;
 
 struct client_menu {
-    size_t cnt;
-    size_t data[MAX_DISHES];
+    size_t  cnt;
+    ssize_t data[MAX_DISHES];
 };
 
 typedef struct {

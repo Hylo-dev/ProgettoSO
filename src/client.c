@@ -15,24 +15,61 @@
 //       dish for the FIRST and one for the MAIN
 void
 pick_dishes(
-    struct client_menu* menu,
-    const simctx_t *ctx
+    struct client_menu *menu,
+    const  simctx_t    *ctx,
+           location_t  *loc
 ) {
-    size_t rnd;
+    ssize_t rnd;
+    ssize_t cur_loc;
+    size_t  cnt_nf;
+    
+    do {
+        cur_loc   = -1;
+        cnt_nf    = 0;
+        menu->cnt = 0;
 
-    rnd = (size_t)rand()%ctx->menu[FIRST].size;              // first_menu_size;
-    menu->data[FIRST] = ctx->menu[FIRST].elements[rnd].id;   // ctx->first_menu[rnd].id;
+        if (
+           ctx->menu[FIRST ].size == 0 ||
+           ctx->menu[MAIN  ].size == 0 ||
+           ctx->menu[COFFEE].size == 0 
 
-    rnd = (size_t)rand()%ctx->menu[MAIN].size;               // ctx->main_menu_size;
-    menu->data[MAIN]  = ctx->menu[MAIN].elements[rnd].id;    // ctx->main_menu[rnd].id;
+        ) { panic("ERROR: Menu not have dishes\n"); }
 
-    menu->cnt += 2;
+        rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); // -1 ..< size
+        if (rnd != -1) {
+            cur_loc = FIRST_COURSE;
+            menu->data[FIRST] = ctx->menu[FIRST].elements[rnd].id;
+            
+        } else {
+            cnt_nf++;
+            menu->data[FIRST] = -1;
+        }
 
-    rnd = (size_t)rand()%(ctx->menu[COFFEE].size + 1);       // coffee_menu_size+1);
-    if (rnd >= ctx->menu[COFFEE].size) return;
+        rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); // -1 ..< size
+        if (rnd != -1) {
+            if (cur_loc == -1) cur_loc = MAIN;
+            menu->data[MAIN] = ctx->menu[MAIN].elements[rnd].id;
+            
+        } else {
+            cnt_nf++;
+            menu->data[MAIN] = -1;
+        }
+    
+        rnd = (ssize_t)(rand() % (ctx->menu[COFFEE].size + 1) - 1);
+        if (rnd != -1) {
+            if (cur_loc == -1) cur_loc = COFFEE;
+            menu->data[COFFEE] = ctx->menu[COFFEE].elements[rnd].id;
+            
+        } else {
+            cnt_nf++;
+            menu->data[COFFEE] = -1;            
+        }
+    
+        menu->cnt = 3;
 
-    menu->data[COFFEE] = ctx->menu[COFFEE].elements[rnd].id; // ctx->coffee_menu[rnd].id;
-    menu->cnt++;
+    } while(cnt_nf == 3);
+    
+    *loc = cur_loc;
 }
 
 int
@@ -41,24 +78,25 @@ main(
     char** argv
 ) {
     // argv must be:
-    // { exec name, bool ticket, shmid for the menu, zprint_sem }
-    if (argc != 3)
+    // { exec name, bool ticket, shmid for the menu, zprint_sem, table_sem }
+    if (argc != 5)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
-    const bool   ticket     = (bool)  atoi(argv[1]);
-    const size_t shmid      = (size_t)atoi(argv[2]);
-    const int    zpr_sem    =         atoi(argv[3]);
-    
-    const simctx_t *ctx  = (simctx_t*)zshmat(shmid, NULL, 0);
+    const bool      ticket    = atob(argv[1]);
+    const size_t    shmid     = atos(argv[2]);
+    const int       zpr_sem   = atoi(argv[3]);
+    const int       table_sem = atoi(argv[4]);
+    const simctx_t *ctx       = (simctx_t*)zshmat(shmid, NULL, 0);
 
     struct client_menu menu = {0};
+    location_t tmp_lc;
 
-    pick_dishes(&menu, ctx);
+    pick_dishes(&menu, ctx, &tmp_lc);
 
     client_t self  = {
         .pid       = getpid(),
         .ticket    = ticket,
-        .loc       = FIRST_COURSE,
+        .loc       = tmp_lc,
         .served    = false,
         .msgq      = ctx->id_msg_q[FIRST_COURSE],
         .wait_time = 0,
@@ -93,13 +131,22 @@ main(
 
         switch (self.loc) {
             case FIRST_COURSE:
+                if (self.loc == FIRST_COURSE && self.dishes.data[FIRST_COURSE] == -1)
+                    break;
+                
             case MAIN_COURSE:
+                if (self.loc == MAIN_COURSE && self.dishes.data[MAIN_COURSE] == -1)
+                    break;
+                
             case COFFEE_BAR:
+                if (self.loc == COFFEE_BAR && self.dishes.data[COFFEE_BAR] == -1)
+                    break;
+                
                 do {
                     send_msg(
-                             self.msgq,
-                             msg,
-                             sizeof(msg_dish_t)-sizeof(long)
+                        self.msgq,
+                         msg,
+                         sizeof(msg_dish_t)-sizeof(long)
                     );
 
                     zprintf(
@@ -160,10 +207,26 @@ main(
             case TABLE:
                 zprintf(
                     zpr_sem,
-                    "CLIENT: %d, %d, EATING\n",
-                    self.pid, self.wait_time
+                    "CLIENT: %d, %d, WAITING TABLE\n",
+                    self.pid, self.loc
+                );
+
+                sem_wait(table_sem, 0);
+                
+                zprintf(
+                    zpr_sem,
+                    "CLIENT %d: Found table, Eating for %zu ns\n",
+                    self.pid,
+                    self.wait_time
                 );
                 znsleep(self.wait_time);
+
+                zprintf(
+                    zpr_sem,
+                    "CLIENT %d: Leaving table\n",
+                    self.pid
+                );
+                sem_signal(table_sem, 0);
                 break;
 
             case EXIT:

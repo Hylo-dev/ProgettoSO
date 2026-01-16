@@ -28,7 +28,6 @@ load_config(
     char *json_content = NULL;
     long file_size = 0;
     cJSON *json = NULL;
-    int status = 0; // 0 = OK, -1 = Errore parziale
 
     // 1. Apertura File
     file = zfopen(filename, "rb");

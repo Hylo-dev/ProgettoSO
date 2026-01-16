@@ -47,7 +47,7 @@ main(
     const simctx_t*  ctx  = (simctx_t*)zshmat(shm_id, NULL, 0);
     const location_t role = ctx->roles[role_idx].role;
           station    st   = get_station(stations, role);
-          worker_t*  wks  = zshmat(st.wk_data.shmid, 0, NULL);
+          worker_t*  wks  = zshmat(st.wk_data.shmid, NULL, 0);
 
     const size_t queue = ctx->id_msg_q[role];
 

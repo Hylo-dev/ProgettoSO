@@ -54,7 +54,7 @@ EXEC_CLIENT = $(BINDIR)/client
 TEST_EXEC   = $(BINDIR)/test_dict_runner
 
 # --- Flags ---
-BASE_FLAGS  = -Wall -Wextra -Wpedantic -Wconversion -D_GNU_SOURCE -I$(APP_DIR) -I$(LIB_DIR)
+BASE_FLAGS  = -Wall -Wextra -Wpedantic -D_GNU_SOURCE -I$(APP_DIR) -I$(LIB_DIR)
 DEBUG_FLAGS = -g -fsanitize=address,undefined -fno-omit-frame-pointer
 PROD_FLAGS  = -O3 -march=native -flto -DNDEBUG
 CFLAGS      = $(BASE_FLAGS) $(DEBUG_FLAGS)

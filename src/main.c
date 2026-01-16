@@ -1,4 +1,4 @@
-#include <cstdint>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,9 +16,6 @@
 #include "tools.h"
 #include "menu.h"
 
-#define for_in(decl, to) \
-            for (size_t decl; i < (size_t)to; i++)
-
 #define SHM_RW 0666
 
 /* Prototipi */
@@ -34,7 +31,7 @@ int _compare_pair_station(const void* a, const void* b) {
     return (second->avg_time - first->avg_time);
 }
 
-inline const int 
+inline int 
 sem_init() {
     const int sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
     semctl(sem, 0, SETVAL, 1);
@@ -61,15 +58,16 @@ main(void) {
     const size_t
     shm_stations_id = zshmget(IPC_PRIVATE, sizeof(station) * NOF_STATIONS, IPC_CREAT | SHM_RW);
 
-    station *st = (station*)zshmat(shm_stations_id, NULL, 0);
-    memset(st, NOF_STATIONS, sizeof(station));
-    for_in(i = 0, NOF_STATIONS) {
-        size_t nworkers = *(&ctx->config.nof_wk_seats[MAI] + 4 * (int)i);
-        st[i].shmid_workers = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
-        st[i].type = (location_t)i;
+    station *stations = (station*)zshmat(shm_stations_id, NULL, 0);
+    memset(stations, NOF_STATIONS, sizeof(station));
+    for (size_t i = 0; i < NOF_STATIONS; i++) {
+        station st = stations[i];
+        size_t nworkers = ctx->config.nof_wk_seats[i];
+        st.wk_data.shmid = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
+        st.type = (location_t)i;
 
-        for_in(j = 0, ctx->menu[i].size) 
-            st[i].menu[j] = ctx->menu[i].elements[j];
+        for (size_t j = 0; j < ctx->menu[i].size; j++) 
+            st.menu[j] = ctx->menu[i].elements[j];
     }
 
     char sshm_id [16];
@@ -82,13 +80,14 @@ main(void) {
     sprintf(sout_sem, "%d" , out_sem);
     sprintf(sshm_sem, "%d" , shm_sem);
 
-    for_in(i = 0, ctx->config.nof_workers)
+    // for(size_t i = 0; i < ctx->config.nof_workers; i++)
+    it (i, 0, ctx->config.nof_workers)
         init_worker(ctx, sshm_id, i, sout_sem, sshm_sem, sshm_st);
 
-    for_in(i = 0, ctx->config.nof_users)
+    it (i, 0, ctx->config.nof_users)
         init_client(sshm_id, sout_sem);
     
-    for_in(i = 0, ctx->config.sim_duration)
+    it(i, 0, ctx->config.sim_duration)
         sim_day(ctx);
 
     while (ctx->is_sim_running) {
@@ -99,13 +98,13 @@ main(void) {
 
         sem_wait(shm_sem, 0);
 
-        for (size_t loc_idx = 0; loc_idx < 2; loc_idx++) {
+        it (loc_idx, 0, 2) {
             dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
             size_t            size_avl = ctx->available_dishes[loc_idx].size;
             size_t            max      = ctx->config.max_porzioni[loc_idx];
             size_t            refill   = ctx->config.avg_refill[loc_idx];
             
-            for (size_t j = 0; j < size_avl; j++) {
+            it (j, 0, size_avl) {
                 size_t* qty = &elem_avl[j].quantity;
 
                 *qty += refill;
@@ -124,7 +123,8 @@ main(void) {
     shmctl(ctx->shmid_roles, IPC_RMID, NULL);
     semctl(out_sem, 0, IPC_RMID);
     semctl(shm_sem, 0, IPC_RMID);
-    for_in(i=0, NOF_STATIONS) msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
+    it(i, 0, NOF_STATIONS)
+        msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
 
     return 0;
 }
@@ -217,25 +217,15 @@ init_ctx(
     load_menu("data/menu.json", ctx);
 
     // Inizializzazione piatti disponibili (Logica invariata)
-    for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {
-        ctx->available_dishes[MAIN].elements[i].id = ctx->menu[MAIN].elements[i].id;
-        ctx->available_dishes[MAIN].elements[i].quantity = ctx->config.avg_refill[MAIN];
-        ctx->available_dishes[MAIN].size++;
+    it (loc, 0, 3){
+        struct available_dishes dishes = ctx->available_dishes[loc];
+        it (i, 0, ctx->menu[loc].size) {
+            dishes.elements[i].id = ctx->menu[loc].elements[i].id;
+            dishes.elements[i].quantity = ctx->config.avg_refill[loc];
+            dishes.size++;
+        }
     }
 
-    for (size_t i = 0; i < ctx->menu[FIRST].size; i++) {
-        ctx->available_dishes[FIRST].elements[i].id = ctx->menu[FIRST].elements[i].id;
-        ctx->available_dishes[FIRST].elements[i].quantity = ctx->config.avg_refill[FIRST];
-        ctx->available_dishes[FIRST].size++;
-    }
-
-    for (size_t i = 0; i < ctx->menu[COFFEE].size; i++) {
-        ctx->available_dishes[COFFEE].elements[i].id = ctx->menu[COFFEE].elements[i].id;
-        ctx->available_dishes[COFFEE].elements[i].quantity = SIZE_MAX;
-        ctx->available_dishes[COFFEE].size++;
-    }
-
-    
     assign_roles(ctx);
 
     return ctx;
@@ -259,7 +249,7 @@ assign_roles(
         roles_buffer[assigned_count++] = CHECKOUT;     // 3
         
     } else {
-        for_in(i=0, num_workers)
+        it(i,0, num_workers)
             roles_buffer[assigned_count++] = (location_t)i;
     }
 

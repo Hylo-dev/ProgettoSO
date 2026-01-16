@@ -21,9 +21,12 @@ typedef       void* any;
 // const any type
 typedef const void* let_any; 
 
-#define foreach(DECL, ARRAY_OF_PTRS, COUNT) \
-    for (size_t _fe_i = 0; _fe_i < (COUNT); _fe_i++) \
-        for (DECL = (ARRAY_OF_PTRS)[_fe_i], * _fe_once = (void*)1; (size_t)_fe_once; _fe_once = (void*)0)
+#define it(var, start, end) \
+    for ( \
+        int var = (int)(start); \
+        var != (int)(end); \
+        var += ((int)(start) < (int)(end) ? 1 : -1)\
+    )
 
 static inline void
 panic(const char* fmt, ...) {

@@ -201,4 +201,9 @@ atos(const char* str) {
     return (size_t)atoi(str);
 }
 
+static inline bool
+atob(const char* str) {
+    return (bool)atoi(str);
+}
+
 #endif

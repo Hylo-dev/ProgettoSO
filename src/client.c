@@ -72,6 +72,17 @@ pick_dishes(
     *loc = cur_loc;
 }
 
+
+static dish_t
+get_dish_from_wk(
+    const simctx_t*,
+          client_t,
+          msg_dish_t,
+          int,
+          msg_dish_t* 
+);
+
+
 int
 main(
     int    argc,
@@ -82,11 +93,12 @@ main(
     if (argc != 5)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
-    const bool      ticket    = atob(argv[1]);
-    const size_t    shmid     = atos(argv[2]);
-    const int       zpr_sem   = atoi(argv[3]);
-    const int       table_sem = atoi(argv[4]);
-    const simctx_t *ctx       = (simctx_t*)zshmat(shmid, NULL, 0);
+    const bool   ticket  = atob(argv[1]);
+    const size_t shmid   = atos(argv[2]);
+    const int    zpr_sem = atoi(argv[3]);
+    const int    tbl_sem = atoi(argv[4]);
+    
+    const simctx_t *ctx  = get_ctx(shmid);
 
     struct client_menu menu = {0};
     location_t tmp_lc;
@@ -102,16 +114,11 @@ main(
         .wait_time = 0,
         .dishes    = menu
     };
-
+        
     msg_dish_t response;
-    //zprintf(zpr_sem, "CLIENT_l: %d, %d\n", self.loc, EXIT);
-    while (ctx->is_sim_running) {
-        zprintf(
-            zpr_sem,
-            "CLIENT: %d, loc: %d\n",
-            self.pid, self.loc
-        );
+    int        price;
 
+    while (ctx->is_sim_running) {
         if (self.loc < NOF_STATIONS)
             self.msgq = ctx->id_msg_q[self.loc];
 
@@ -126,12 +133,13 @@ main(
                 self.loc < 3 ? self.dishes.data[self.loc] : 0,
                 "", 0, 0
             },
-            .status = REQUEST_OK
+            .status = REQUEST_OK,
+            .price  = self.loc == CHECKOUT ? price : 0
         };
 
         switch (self.loc) {
             case FIRST_COURSE:
-                if (self.loc == FIRST_COURSE && self.dishes.data[FIRST_COURSE] == -1)
+                if (self.dishes.data[FIRST_COURSE] == -1)
                     break;
                 
             case MAIN_COURSE:
@@ -141,67 +149,26 @@ main(
             case COFFEE_BAR:
                 if (self.loc == COFFEE_BAR && self.dishes.data[COFFEE_BAR] == -1)
                     break;
+
+                dish_t dish = get_dish_from_wk(
+                    ctx,
+                    self,
+                    msg,
+                    zpr_sem,
+                    &response
+                );
+
+                price += dish.price;
+                self.dishes.data[self.loc] = dish.id;
                 
-                do {
-                    send_msg(
-                        self.msgq,
-                         msg,
-                         sizeof(msg_dish_t)-sizeof(long)
-                    );
-
-                    zprintf(
-                        zpr_sem,
-                        "CLIENT: %d, %d, WAITING\n",
-                        self.pid, self.msgq
-                    );
-
-                    // chiamata bloccante, sta fermo qui finche' non riceve una risposta
-                    recive_msg(self.msgq, self.pid, &response);
-
-                    zprintf(
-                        zpr_sem,
-                        "CLIENT: %d, SERVED\n",
-                        self.pid
-                    );
-
-                    if (response.status == ERROR) {
-                        const size_t menu_size = ctx->menu[self.loc].size;
-
-                        if (menu_size > 1) {
-                            size_t temp;
-                            while ((temp = (size_t)rand()%menu_size) == msg.dish.id);
-                            msg.dish.id  = temp;
-                            msg.mtype    = HIGH;
-
-                        } else { goto END; } // GOTO used because the REDIS creator uses it :)
-                    }
-
-                    // zprintf(zpr_sem, "C_INFO: %d\n", response.dish.eating_time);
-                    self.wait_time += response.dish.eating_time;
-
-                } while (ctx->is_sim_running && response.status == ERROR);
-
-                END:
-                self.dishes.data[self.loc] = msg.dish.id;
                 break;
 
             case CHECKOUT:
+
                 send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
 
-                zprintf(
-                    zpr_sem,
-                    "CLIENT: %d, %d, WAITING\n",
-                    self.pid, self.loc
-                );
-
-                // chiamata bloccante, sta fermo qui finche' non riceve una risposta
                 recive_msg(self.msgq, self.pid, &response);
 
-                zprintf(
-                    zpr_sem,
-                    "CLIENT: %d, SERVED\n",
-                    self.pid
-                );
                 break;
 
             case TABLE:
@@ -211,7 +178,7 @@ main(
                     self.pid, self.loc
                 );
 
-                sem_wait(table_sem, 0);
+                sem_wait(tbl_sem);
                 
                 zprintf(
                     zpr_sem,
@@ -226,7 +193,7 @@ main(
                     "CLIENT %d: Leaving table\n",
                     self.pid
                 );
-                sem_signal(table_sem, 0);
+                sem_signal(tbl_sem);
                 break;
 
             case EXIT:
@@ -240,4 +207,55 @@ main(
 
         self.loc++;
     }
+}
+
+
+
+static dish_t
+get_dish_from_wk(
+    const simctx_t*   ctx,
+          client_t    self,
+          msg_dish_t  msg,
+          int         zpr_sem,
+          msg_dish_t* response
+) {
+    do {
+        send_msg(
+            self.msgq,
+            msg,
+            sizeof(msg_dish_t)-sizeof(long)
+        );
+
+        zprintf(
+            zpr_sem,
+            "CLIENT: %d, %d, WAITING\n",
+            self.pid, self.msgq
+        );
+
+        recive_msg(self.msgq, self.pid, response);
+
+        zprintf(
+            zpr_sem,
+            "CLIENT: %d, SERVED\n",
+            self.pid
+        );
+
+        if (response->status == ERROR) {
+            const size_t menu_size = ctx->menu[self.loc].size;
+
+            if (menu_size > 1) {
+                size_t temp;
+                while ((temp = (size_t)rand()%menu_size) == msg.dish.id);
+                msg.dish.id  = temp;
+                msg.mtype    = HIGH;
+
+            } else
+                return msg.dish;
+        }
+
+        self.wait_time += response->dish.eating_time;
+
+    } while (ctx->is_sim_running && response->status == ERROR);
+
+    return msg.dish;
 }

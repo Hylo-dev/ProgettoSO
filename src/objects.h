@@ -8,6 +8,12 @@
 
 #define DISH_NAME_MAX_LEN 32
 
+union _semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+};
+
 // incorpora sia i tipi di stazioni sia dove puo' trovarsi un utente.
 // nel caso delle stazioni 'TABLE' e' ignorato
 typedef enum {

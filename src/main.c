@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/sem.h>
 #include <time.h>
 #include <stdlib.h> // Necessario per malloc/free
 
@@ -19,7 +20,7 @@
 #define SHM_RW 0666
 
 /* Prototipi */
-void init_client(char*, char*);
+void init_client(char*, char*, char*);
 void init_worker(simctx_t*, char*, size_t, char*, char*, char*);
 void sim_day(simctx_t* ctx);
 void assign_roles(simctx_t* ctx);
@@ -31,19 +32,9 @@ int _compare_pair_station(const void* a, const void* b) {
     return (second->avg_time - first->avg_time);
 }
 
-inline int 
-sem_init() {
-    const int sem = semget(IPC_PRIVATE, 1, IPC_CREAT | SHM_RW);
-    semctl(sem, 0, SETVAL, 1);
-    return sem;
-}
-
 int
 main(void) {
     /* ========================== INIT ========================== */
-    const int out_sem = sem_init();
-    const int shm_sem = sem_init();
-    
     srand((unsigned int)time(NULL));
 
     const size_t
@@ -55,37 +46,46 @@ main(void) {
 
     simctx_t* ctx = init_ctx(shm_id);
 
+    const int out_sem = sem_init(1);
+    const int shm_sem = sem_init(1);
+    const int tbl_sem = sem_init(ctx->config.nof_wk_seats[TABLE]);
+
     const size_t
     shm_stations_id = zshmget(IPC_PRIVATE, sizeof(station) * NOF_STATIONS, IPC_CREAT | SHM_RW);
 
-    station *stations = (station*)zshmat(shm_stations_id, NULL, 0);
-    memset(stations, NOF_STATIONS, sizeof(station));
+    station *st = get_stations(shm_stations_id);
+    memset(st, NOF_STATIONS, sizeof(station));
     for (size_t i = 0; i < NOF_STATIONS; i++) {
-        station st = stations[i];
         size_t nworkers = ctx->config.nof_wk_seats[i];
-        st.wk_data.shmid = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
-        st.type = (location_t)i;
+        st[i].wk_data.shmid = zshmget(
+                                IPC_PRIVATE,
+                                sizeof(worker_t) * nworkers,
+                                IPC_CREAT | SHM_RW
+                              );
+        
+        st[i].type = (location_t)i;
 
         for (size_t j = 0; j < ctx->menu[i].size; j++) 
-            st.menu[j] = ctx->menu[i].elements[j];
+            st[i].menu[j] = ctx->menu[i].elements[j];
     }
 
     char sshm_id [16];
     char sshm_st [16];
     char sout_sem[16];
     char sshm_sem[16];
+    char stbl_sem[16];
 
     sprintf(sshm_id,  "%zu", shm_id );
     sprintf(sshm_st,  "%zu", shm_stations_id);
     sprintf(sout_sem, "%d" , out_sem);
     sprintf(sshm_sem, "%d" , shm_sem);
+    sprintf(stbl_sem, "%d" , tbl_sem);
 
-    // for(size_t i = 0; i < ctx->config.nof_workers; i++)
     it (i, 0, ctx->config.nof_workers)
         init_worker(ctx, sshm_id, i, sout_sem, sshm_sem, sshm_st);
 
     it (i, 0, ctx->config.nof_users)
-        init_client(sshm_id, sout_sem);
+        init_client(sshm_id, sout_sem, stbl_sem);
     
     it(i, 0, ctx->config.sim_duration)
         sim_day(ctx);
@@ -96,7 +96,7 @@ main(void) {
 
         if (!ctx->is_sim_running) break;
 
-        sem_wait(shm_sem, 0);
+        sem_wait(shm_sem);
 
         it (loc_idx, 0, 2) {
             dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
@@ -113,7 +113,7 @@ main(void) {
             
         }
 
-        sem_signal(shm_sem, 0);
+        sem_signal(shm_sem);
     }
 
 
@@ -137,7 +137,8 @@ void sim_day(simctx_t* ctx) {
 
 void init_client(
     char *shmid,
-    char *zprintf_sem
+    char *out_sem,
+    char *tbl_sem
 ) {
     const pid_t pid = zfork();
 
@@ -146,7 +147,8 @@ void init_client(
             "client",
             rand()%2 ? "1":"0",
             shmid,
-            zprintf_sem,
+            out_sem,
+            tbl_sem,
             NULL
         };
         execve("./bin/client", args, NULL);
@@ -192,7 +194,7 @@ simctx_t*
 init_ctx(
     const size_t shm_id
 ) {
-    simctx_t* ctx = (simctx_t*)zshmat(shm_id, NULL, 0);
+    simctx_t* ctx = get_ctx(shm_id);
 
     memset(ctx, 0, sizeof(simctx_t));
     ctx->is_sim_running = true;
@@ -204,7 +206,7 @@ init_ctx(
     ctx->shmid_roles = zshmget(IPC_PRIVATE, roles_size, IPC_CREAT | SHM_RW);
     
     // Attacchiamo il puntatore nel processo padre (Main)
-    ctx->roles = (worker_role_t*)zshmat(ctx->shmid_roles, NULL, 0);
+    ctx->roles = (worker_role_t*)zshmat(ctx->shmid_roles);
     
     // Azzeriamo la memoria dei ruoli
     memset(ctx->roles, 0, roles_size);

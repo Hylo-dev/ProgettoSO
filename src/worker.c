@@ -1,4 +1,3 @@
-#include <cstdarg>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +10,7 @@
 
 static inline station*
 get_station(size_t stations_shmid, location_t role) {
-    station* st = &((station*)shmat(stations_shmid, NULL, 0))[role];
+    station* st = &(get_stations(stations_shmid))[role];
     return st;
 }
 
@@ -55,10 +54,10 @@ main(
     const int    shm_sem  = atoi(argv[4]);
     const size_t stations = atos(argv[5]);
 
-          simctx_t   *ctx  = (simctx_t*)zshmat(shm_id, NULL, 0);
+          simctx_t   *ctx  = get_ctx(shm_id);
     const location_t  role = ctx->roles[role_idx].role;
           station    *st   = get_station(stations, role);
-          worker_t   *wks  = zshmat(st->wk_data.shmid, NULL, 0);
+          worker_t   *wks  = get_workers(st->wk_data.shmid);
 
     const size_t queue = ctx->id_msg_q[role];
 
@@ -75,7 +74,7 @@ main(
     };
 
     worker_t *self  = &wks[idx];
-    sem_signal(st->sem, 0);
+    sem_signal(st->sem);
     
     double     variance = var_srvc[self->role];
     msg_dish_t response;
@@ -195,7 +194,7 @@ serve_client(
     zprintf(zpr_sem, "WORKER %d: Service time %zu ns\n", getpid(), actual_time);
     znsleep(actual_time);
 
-    sem_wait(shm_sem, 0);
+    sem_wait(shm_sem);
 
     if (self->role != CHECKOUT) {
         _serve_food(ctx, self, st, response, actual_time, zpr_sem);
@@ -204,5 +203,5 @@ serve_client(
         _serve_checkout(self, ctx, st, response);
     }
 
-    sem_signal(shm_sem, 0);
+    sem_signal(shm_sem);
 }

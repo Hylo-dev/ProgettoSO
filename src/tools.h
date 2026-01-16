@@ -14,6 +14,7 @@
 #include <sys/sem.h>
 
 #include "const.h"
+#include "objects.h"
 
 // any type
 typedef       void* any; 
@@ -87,15 +88,32 @@ zshmget(key_t key, size_t size, int mode){
 
 static inline any
 zshmat(
-          size_t shmid,
-    const any    shmaddr,
-          int    shmflg
+    size_t shmid
 ){
-    any res = shmat((int)shmid, shmaddr, shmflg);
+    // Won't choose the address, the kern will do it (NULL)
+    // default read and write flags (0)
+    any res = shmat((int)shmid, NULL, 0);
     if (res == (void*)-1)
         panic("ERROR: Shared memory `at` is failed\n");
     return res;
 }
+
+static inline simctx_t*
+get_ctx(size_t shmid) {
+    return (simctx_t*)zshmat(shmid);
+}
+
+static inline station*
+get_stations(size_t shmid) {
+    return (station*)zshmat(shmid);
+}
+
+static inline worker_t*
+get_workers(size_t shmid) {
+    return (worker_t*)zshmat(shmid);
+}
+
+
 
 /* ====================== MSG WRAPPER ====================== */
 static inline size_t
@@ -110,39 +128,45 @@ zmsgget(
     return (size_t)result;
 }
 
+static inline int
+sem_init(int val) {
+    int sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
+    
+    if (sem_id == -1)
+        panic("ERROR: Semaphore init failed\n");
 
-static void
-sem_wait(
-    const int sem_id,
-    const int sem_num
-) {
-    struct sembuf sops;
-    sops.sem_num = (unsigned short)sem_num;
-    sops.sem_op  = -1;
-    sops.sem_flg = 0;
+    union _semun arg;
+    arg.val = val; 
 
-    // Manage INTR SIG (EINTR)
-    while (semop(sem_id, &sops, 1) == -1) {
-        if (errno != EINTR) {
-            perror("ERROR: sem_wait interrupt");
-            break; 
-        }
-    }
+    if (semctl(sem_id, 0, SETVAL, arg) == -1) 
+        panic("ERROR: Semaphore init failed\n");
+    
+    return sem_id;
 }
 
-static void
-sem_signal(
-    const int sem_id,
-    const int sem_num
-) {
-    struct sembuf sops;
-    sops.sem_num = (unsigned short)sem_num;
-    sops.sem_op  = 1;
-    sops.sem_flg = 0;
+// Operazione P: Decrementa (Wait)
+static inline void
+sem_wait(int sem_id) {
+    struct sembuf sb;
+    sb.sem_num =  0;
+    sb.sem_op  = -1;
+    sb.sem_flg =  0;
 
-    if (semop(sem_id, &sops, 1) == -1) {
-        perror("ERROR: sem_signal failed");
-    }
+    if (semop(sem_id, &sb, 1) == -1) 
+        panic("ERROR: `sem_wait` failed");
+}
+
+// Operaxzione V: Incrementa (Signal)
+static inline void
+sem_signal(int sem_id) {
+    struct sembuf sb;
+    sb.sem_num = 0;
+    sb.sem_op  = 1;
+    sb.sem_flg = 0;
+
+    if (semop(sem_id, &sb, 1) == -1)
+        panic("ERROR: `sem_wait` failed");
+
 }
 
 static void
@@ -152,7 +176,7 @@ zprintf(
 ) {
     va_list args;
 
-    sem_wait(sem_id, 0);
+    sem_wait(sem_id);
 
     va_start(args, fmt);
     vprintf(fmt, args);
@@ -160,7 +184,7 @@ zprintf(
 
     fflush(stdout);
 
-    sem_signal(sem_id, 0);
+    sem_signal(sem_id);
 }
 
 static inline void
@@ -195,6 +219,8 @@ zfsize(FILE* file) {
     fseek(file, 0, SEEK_SET);
     return fsize;
 }
+
+/* ======================= SUPPORT  ========================*/
 
 static inline size_t
 atos(const char* str) {

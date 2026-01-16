@@ -64,7 +64,7 @@ main(void) {
     station *st = (station*)zshmat(shm_stations_id, NULL, 0);
     memset(st, NOF_STATIONS, sizeof(station));
     for_in(i = 0, NOF_STATIONS) {
-        size_t nworkers = *(&ctx->config.nof_wk_seats_primi + 4 * (int)i);
+        size_t nworkers = *(&ctx->config.nof_wk_seats[MAI] + 4 * (int)i);
         st[i].shmid_workers = zshmget(IPC_PRIVATE, sizeof(worker_t) * nworkers, IPC_CREAT | SHM_RW);
         st[i].type = (location_t)i;
 
@@ -93,7 +93,7 @@ main(void) {
 
     while (ctx->is_sim_running) {
 
-        znsleep(600);
+        znsleep(10);
 
         if (!ctx->is_sim_running) break;
 
@@ -102,10 +102,9 @@ main(void) {
         for (size_t loc_idx = 0; loc_idx < 2; loc_idx++) {
             dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
             size_t            size_avl = ctx->available_dishes[loc_idx].size;
-            size_t            max      = loc_idx == 0 ? ctx->config.max_porzioni_primi :
-                                                        ctx->config.max_porzioni_secondi;
-            size_t            refill   = loc_idx == 0 ? ctx->config.avg_refill_primi :
-                                                        ctx->config.avg_refill_secondi;
+            size_t            max      = ctx->config.max_porzioni[loc_idx];
+            size_t            refill   = ctx->config.avg_refill[loc_idx];
+            
             for (size_t j = 0; j < size_avl; j++) {
                 size_t* qty = &elem_avl[j].quantity;
 
@@ -220,13 +219,13 @@ init_ctx(
     // Inizializzazione piatti disponibili (Logica invariata)
     for (size_t i = 0; i < ctx->menu[MAIN].size; i++) {
         ctx->available_dishes[MAIN].elements[i].id = ctx->menu[MAIN].elements[i].id;
-        ctx->available_dishes[MAIN].elements[i].quantity = ctx->config.avg_refill_primi;
+        ctx->available_dishes[MAIN].elements[i].quantity = ctx->config.avg_refill[MAIN];
         ctx->available_dishes[MAIN].size++;
     }
 
     for (size_t i = 0; i < ctx->menu[FIRST].size; i++) {
         ctx->available_dishes[FIRST].elements[i].id = ctx->menu[FIRST].elements[i].id;
-        ctx->available_dishes[FIRST].elements[i].quantity = ctx->config.avg_refill_secondi;
+        ctx->available_dishes[FIRST].elements[i].quantity = ctx->config.avg_refill[FIRST];
         ctx->available_dishes[FIRST].size++;
     }
 
@@ -265,10 +264,10 @@ assign_roles(
     }
 
     struct pair_station priority_list[4] = {
-        { FIRST_COURSE, ctx->config.avg_srvc_primi },
-        { MAIN_COURSE,  ctx->config.avg_srvc_main_course },
-        { COFFEE_BAR,   ctx->config.avg_srvc_coffee },
-        { CHECKOUT,     ctx->config.avg_srvc_cassa }
+        { FIRST_COURSE, ctx->config.avg_srvc[FIRST_COURSE] },
+        { MAIN_COURSE,  ctx->config.avg_srvc[MAIN_COURSE]  },
+        { COFFEE_BAR,   ctx->config.avg_srvc[COFFEE_BAR]   },
+        { CHECKOUT,     ctx->config.avg_srvc[CHECKOUT]     }
     };
 
     qsort(priority_list, 4, sizeof(struct pair_station), _compare_pair_station);

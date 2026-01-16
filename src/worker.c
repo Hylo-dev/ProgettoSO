@@ -146,9 +146,6 @@ _serve_food(
             st->stats.served_dishes++;
             st->stats.worked_time += time;
 
-            //if (self->role == CHECKOUT)
-            //    st->stats.earnings += current_dish_info.price;
-            
             response->status = RESPONSE_OK;
             response->dish   = current_dish_info;
             
@@ -167,7 +164,6 @@ _serve_food(
 static inline void
 _serve_checkout(
     const worker_t   *self,
-          simctx_t   *ctx,
           station    *st,
           msg_dish_t *response
 ) {
@@ -196,11 +192,11 @@ serve_client(
 
     sem_wait(shm_sem);
 
-    if (self->role != CHECKOUT) {
-        _serve_food(ctx, self, st, response, actual_time, zpr_sem);
+    if (self->role == CHECKOUT) {
+        _serve_checkout(self, st, response);
                 
     } else {
-        _serve_checkout(self, ctx, st, response);
+        _serve_food(ctx, self, st, response, actual_time, zpr_sem);
     }
 
     sem_signal(shm_sem);

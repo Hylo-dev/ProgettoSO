@@ -168,7 +168,6 @@ _serve_food(
 static inline void
 _serve_checkout(
     const worker_t   *self,
-          simctx_t   *ctx,
           station    *st,
           msg_dish_t *response
 ) {
@@ -201,7 +200,7 @@ serve_client(
         _serve_food(ctx, self, st, response, actual_time, zpr_sem);
                 
     } else {
-        _serve_checkout(self, ctx, st, response);
+        _serve_checkout(self, st, response);
     }
 
     sem_signal(shm_sem, 0);

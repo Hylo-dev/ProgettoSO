@@ -1,4 +1,3 @@
-#include <cstdarg>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,9 +146,6 @@ _serve_food(
             st->stats.served_dishes++;
             st->stats.worked_time += time;
 
-            //if (self->role == CHECKOUT)
-            //    st->stats.earnings += current_dish_info.price;
-            
             response->status = RESPONSE_OK;
             response->dish   = current_dish_info;
             
@@ -194,13 +190,13 @@ serve_client(
     zprintf(zpr_sem, "WORKER %d: Service time %zu ns\n", getpid(), actual_time);
     znsleep(actual_time);
 
-    sem_wait(shm_sem, 0);
+    sem_wait(shm_sem);
 
-    if (self->role != CHECKOUT) {
-        _serve_food(ctx, self, st, response, actual_time, zpr_sem);
+    if (self->role == CHECKOUT) {
+        _serve_checkout(self, st, response);
                 
     } else {
-        _serve_checkout(self, st, response);
+        _serve_food(ctx, self, st, response, actual_time, zpr_sem);
     }
 
     sem_signal(shm_sem, 0);

@@ -24,6 +24,7 @@ typedef struct {
     pid_t  client;
     int    status; // -1: error, 0: OK (response), 1: ok (request)
     dish_t dish;
+    int    price;
 } msg_dish_t;
 
 
@@ -41,9 +42,9 @@ send_msg(
 
 static int
 recive_msg(
-    const size_t qid,
-    const long   mtype,
-    msg_dish_t *out
+    const size_t  qid,
+    const long    mtype,
+    msg_dish_t   *out
 ) {
     const size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
 

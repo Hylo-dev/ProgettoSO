@@ -18,11 +18,11 @@
 
 /* =================== AVERAGE TIMES =================== */
 static double var_srvc[] = {
-    0.5, // VAR_SRVC_FIRST_COURSE 
-    0.5, // VAR_SRVC_MAIN_COURSE 
-    0.8, // VAR_SRVC_COFFEE 
-    0.2, // VAR_SRVC_CHECKOUT 
-    0.2, // VAR_SRVC_REFILL 
+    50, // VAR_SRVC_FIRST_COURSE 
+    50, // VAR_SRVC_MAIN_COURSE 
+    80, // VAR_SRVC_COFFEE 
+    20, // VAR_SRVC_CHECKOUT 
+    20, // VAR_SRVC_REFILL 
 };
 
 /* ====================== SIM DATA ===================== */

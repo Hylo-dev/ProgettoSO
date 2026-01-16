@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "msg.h"
@@ -16,9 +17,16 @@ void
 serve_client(
     const worker_t*,
     const simctx_t*,
+          station*,
           msg_dish_t*,
     const int,
     const int         
+);
+
+size_t
+get_service_time(
+    size_t,
+    size_t  
 );
 
 int
@@ -61,7 +69,7 @@ main(
         .queue      = queue,
     };
 
-    worker_t *self  = &wks[st.wk_data.cnt++];
+    worker_t *self     = &wks[st.wk_data.cnt++];
     sem_signal(st.sem, 0);
 
     msg_dish_t response;
@@ -72,6 +80,8 @@ main(
             case COFFEE_BAR:
             case FIRST_COURSE:
             case MAIN_COURSE:
+                
+                
                 serve_client(self, ctx, &response, shm_sem, zpr_sem);
                 break;
 
@@ -89,11 +99,25 @@ main(
     }
 }
 
+size_t
+get_service_time(
+    size_t avg_time,
+    size_t percent
+) {
+    if (avg_time == 0) return 0;
+
+    size_t delta     = (avg_time * percent) / 100;
+    long   variation = (rand() % (2 * delta + 1)) - delta;
+    long   result    = (long)avg_time - variation;
+    
+    return (result > 0) ? (size_t)result : 0;
+}
 
 void
 serve_client(
     const worker_t   *self,
     const simctx_t   *ctx,
+          station    *st,
           msg_dish_t *response,
     const int         shm_sem,
     const int         zpr_sem
@@ -122,8 +146,12 @@ serve_client(
 
             response->status = RESPONSE_OK;
             response->dish   = current_dish_info;
-        } else
-            response->status = ERROR;
+
+            // Conta quanti piatti sono stati serviti.
+            st->stats.served_dishes++;
+            st->stats.worked_time
+            
+        } else { response->status = ERROR; }
             
     } else {
         zprintf(

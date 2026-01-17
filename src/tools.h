@@ -128,7 +128,7 @@ zmsgget(
     return (size_t)result;
 }
 
-static inline int
+static inline sem_t
 sem_init(int val) {
     int sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
     
@@ -146,7 +146,7 @@ sem_init(int val) {
 
 // Operazione P: Decrementa (Wait)
 static inline void
-sem_wait(int sem_id) {
+sem_wait(sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num =  0;
     sb.sem_op  = -1;
@@ -158,7 +158,7 @@ sem_wait(int sem_id) {
 
 // Operaxzione V: Incrementa (Signal)
 static inline void
-sem_signal(int sem_id) {
+sem_signal(sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num = 0;
     sb.sem_op  = 1;
@@ -171,7 +171,7 @@ sem_signal(int sem_id) {
 
 static void
 zprintf(
-    const int   sem_id,
+    const sem_t sem_id,
     const char *fmt, ...
 ) {
     va_list args;
@@ -198,21 +198,6 @@ znsleep(const size_t wait_time) {
 
     nanosleep(&req, NULL);
 }
-
-static inline size_t
-get_service_time(
-    size_t avg_time,
-    size_t percent
-) {
-    if (avg_time == 0) return 0;
-
-    size_t delta     = (avg_time * percent) / 100;
-    long   variation = (rand() % (2 * delta + 1)) - delta;
-    long   result    = (long)avg_time - variation;
-    
-    return (result > 0) ? (size_t)result : 0;
-}
-
 
 
 /* ===================== FILES ===================== */
@@ -246,5 +231,34 @@ static inline bool
 atob(const char* str) {
     return (bool)atoi(str);
 }
+
+static inline char*
+itos(int val) {
+    static char buffers[4][12]; 
+    static int idx = 0;
+
+    char* current = buffers[idx];
+    
+    idx = (idx + 1) % 4;
+
+    sprintf(current, "%d", val);
+    return current;
+}
+
+
+static inline size_t
+get_service_time(
+    size_t avg_time,
+    size_t percent
+) {
+    if (avg_time == 0) return 0;
+
+    size_t delta     = (avg_time * percent) / 100;
+    long   variation = (rand() % (2 * delta + 1)) - delta;
+    long   result    = (long)avg_time - variation;
+    
+    return (result > 0) ? (size_t)result : 0;
+}
+
 
 #endif

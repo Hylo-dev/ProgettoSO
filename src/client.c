@@ -17,7 +17,7 @@ void
 pick_dishes(
     struct client_menu *menu,
     const  simctx_t    *ctx,
-           location_t  *loc
+           loc_t  *loc
 ) {
     ssize_t rnd;
     ssize_t cur_loc;
@@ -77,9 +77,9 @@ static dish_t
 ask_dish(
     const simctx_t*,
     client_t,
-    msg_dish_t,
+    msg_t,
     int,
-    msg_dish_t* 
+    msg_t* 
 );
 
 
@@ -93,21 +93,20 @@ main(
      *    exec name,
      *    ticket,
      *    ctx_shmid,
-     *    zprint_sem,
-     *    table_sem
      * } */
     if (argc != 5)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
     const bool   ticket  = atob(argv[1]);
     const size_t shmid   = atos(argv[2]);
-    const int    zpr_sem = atoi(argv[3]);
-    const int    tbl_sem = atoi(argv[4]);
     
     const simctx_t *ctx  = get_ctx(shmid);
 
+    const sem_t out_sem = ctx->sem.out;
+    const sem_t tbl_sem = ctx->sem.tbl;
+
     struct client_menu menu = {0};
-    location_t tmp_lc;
+    loc_t tmp_lc;
 
     pick_dishes(&menu, ctx, &tmp_lc);
 
@@ -121,14 +120,14 @@ main(
         .dishes    = menu
     };
         
-    msg_dish_t response;
+    msg_t response;
     int        price;
 
     while (ctx->is_sim_running) {
         if (self.loc < NOF_STATIONS)
             self.msgq = ctx->id_msg_q[self.loc];
 
-        msg_dish_t msg = {
+        msg_t msg = {
             /* l'mtype contiene:
              * la priorita' della richiesta se e' il cliente a mandarlo;
              * il pid del cliente se e' una riposta da parte del worker */
@@ -154,7 +153,7 @@ main(
                     ctx,
                     self,
                     msg,
-                    zpr_sem,
+                    out_sem,
                     &response
                 );
 
@@ -165,7 +164,7 @@ main(
 
             case CHECKOUT:
 
-                send_msg(self.msgq, msg, sizeof(msg_dish_t)-sizeof(long));
+                send_msg(self.msgq, msg, sizeof(msg_t)-sizeof(long));
 
                 recive_msg(self.msgq, self.pid, &response);
 
@@ -173,7 +172,7 @@ main(
 
             case TABLE:
                 zprintf(
-                    zpr_sem,
+                    out_sem,
                     "CLIENT: %d, %d, WAITING TABLE\n",
                     self.pid, self.loc
                 );
@@ -181,7 +180,7 @@ main(
                 sem_wait(tbl_sem);
                 
                 zprintf(
-                    zpr_sem,
+                    out_sem,
                     "CLIENT %d: Found table, Eating for %zu ns\n",
                     self.pid,
                     self.wait_time
@@ -189,7 +188,7 @@ main(
                 znsleep(self.wait_time);
 
                 zprintf(
-                    zpr_sem,
+                    out_sem,
                     "CLIENT %d: Leaving table\n",
                     self.pid
                 );
@@ -198,7 +197,7 @@ main(
 
             case EXIT:
                 zprintf(
-                    zpr_sem,
+                    out_sem,
                     "CLIENT: %d, EXIT\n",
                     self.pid
                 );
@@ -215,15 +214,15 @@ static dish_t
 ask_dish(
     const simctx_t*   ctx,
           client_t    self,
-          msg_dish_t  msg,
+          msg_t  msg,
           int         zpr_sem,
-          msg_dish_t* response
+          msg_t* response
 ) {
     do {
         send_msg(
             self.msgq,
             msg,
-            sizeof(msg_dish_t)-sizeof(long)
+            sizeof(msg_t)-sizeof(long)
         );
 
         zprintf(

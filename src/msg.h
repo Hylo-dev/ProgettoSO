@@ -25,13 +25,13 @@ typedef struct {
     int    status; // -1: error, 0: OK (response), 1: ok (request)
     dish_t dish;
     size_t price;
-} msg_dish_t;
+} msg_t;
 
 
 static int
 send_msg(
     const size_t     qid,
-    const msg_dish_t msg,
+    const msg_t msg,
     const size_t     msg_size
 ) {
 
@@ -44,9 +44,9 @@ static int
 recive_msg(
     const size_t qid,
     const long   mtype,
-    msg_dish_t *out
+    msg_t *out
 ) {
-    const size_t msg_size = sizeof(msg_dish_t)-sizeof(long);
+    const size_t msg_size = sizeof(msg_t)-sizeof(long);
 
     const ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
 

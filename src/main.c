@@ -2,14 +2,14 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/sem.h>
 #include <time.h>
-#include <stdlib.h> // Necessario per malloc/free
-
+#include <stdlib.h>
 #include <unistd.h>
+
 #include <sys/shm.h>
 #include <sys/msg.h>
 #include <sys/wait.h>
+#include <sys/sem.h>
 
 #include "config.h"
 #include "const.h"
@@ -19,11 +19,14 @@
 
 #define SHM_RW 0666
 
+// lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
+static int g_priority_list[4];
+
 /* Prototipi */
-void init_client(char*, char*, char*);
-void init_worker(simctx_t*, char*, size_t, char*, char*, char*);
-void sim_day(simctx_t* ctx);
-void assign_roles(simctx_t* ctx);
+void init_client  (shmid_t);
+void init_worker  (simctx_t*, shmid_t, shmid_t, loc_t);
+void sim_day      (simctx_t*, shmid_t, station*, shmid_t);
+void assign_roles (simctx_t*, station*);
 simctx_t* init_ctx(const size_t);
 
 int _compare_pair_station(const void* a, const void* b) {
@@ -46,61 +49,82 @@ main(void) {
 
     simctx_t* ctx = init_ctx(shm_id);
 
-    const int out_sem = sem_init(1);
-    const int shm_sem = sem_init(1);
-    const int tbl_sem = sem_init(ctx->config.nof_wk_seats[TABLE]);
-
     const size_t
-    shm_stations_id = zshmget(IPC_PRIVATE, sizeof(station) * NOF_STATIONS, IPC_CREAT | SHM_RW);
+    shm_stations_id = zshmget(
+                          IPC_PRIVATE,
+                          sizeof(station) * NOF_STATIONS,
+                          IPC_CREAT | SHM_RW
+                      );
 
     station *st = get_stations(shm_stations_id);
     memset(st, NOF_STATIONS, sizeof(station));
-    for (size_t i = 0; i < NOF_STATIONS; i++) {
-        size_t nworkers = ctx->config.nof_wk_seats[i];
-        st[i].wk_data.shmid = zshmget(
-                                IPC_PRIVATE,
-                                sizeof(worker_t) * nworkers,
-                                IPC_CREAT | SHM_RW
-                              );
+    it (i, 0, NOF_STATIONS) {
+        st[i].type = (loc_t)i;
+        st[i].wk_data.sem = sem_init(ctx->config.nof_wk_seats[i]);
         
-        st[i].type = (location_t)i;
-
-        for (size_t j = 0; j < ctx->menu[i].size; j++) 
+        it (j, 0, ctx->menu[i].size) 
             st[i].menu[j] = ctx->menu[i].elements[j];
+
+        
+        // size_t nworkers = ctx->config.nof_wk_seats[i];
+        // st[i].wk_data.shmid = zshmget(
+        //                         IPC_PRIVATE,
+        //                         sizeof(worker_t) * nworkers,
+        //                         IPC_CREAT | SHM_RW
+        //                       );
+        
+
     }
 
-    char sshm_id [16];
-    char sshm_st [16];
-    char sout_sem[16];
-    char sshm_sem[16];
-    char stbl_sem[16];
-
-    sprintf(sshm_id,  "%zu", shm_id );
-    sprintf(sshm_st,  "%zu", shm_stations_id);
-    sprintf(sout_sem, "%d" , out_sem);
-    sprintf(sshm_sem, "%d" , shm_sem);
-    sprintf(stbl_sem, "%d" , tbl_sem);
-
-    it (i, 0, ctx->config.nof_workers)
-        init_worker(ctx, sshm_id, i, sout_sem, sshm_sem, sshm_st);
-
     it (i, 0, ctx->config.nof_users)
-        init_client(sshm_id, sout_sem, stbl_sem);
+        init_client(shm_id);
     
     it(i, 0, ctx->config.sim_duration)
-        sim_day(ctx);
+        sim_day(ctx, shm_id, st, shm_stations_id);
+
+
+    while(wait(NULL) > 0);
+
+    shmctl(shm_id, IPC_RMID, NULL);
+    semctl(ctx->sem.out, 0, IPC_RMID);
+    semctl(ctx->sem.tbl, 0, IPC_RMID);
+    semctl(ctx->sem.shm, 0, IPC_RMID);
+    semctl(ctx->sem.day, 0, IPC_RMID);
+    it(i, 0, NOF_STATIONS)
+        msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
+
+    return 0;
+}
+
+void sim_day(
+    simctx_t* ctx,
+    shmid_t   ctx_id,
+    station*  stations,
+    shmid_t   st_id
+) {
+    assign_roles(ctx, stations);
+
+    it (type, 0, NOF_STATIONS) {
+        int cnt = stations[type].wk_data.cap;
+
+        it (k, 0, cnt)
+            init_worker(ctx, ctx_id, st_id, (loc_t)type);
+    }
 
     while (ctx->is_sim_running) {
-
         znsleep(600);
 
         if (!ctx->is_sim_running) break;
 
         const size_t avg_refill_time = ctx->config.avg_refill_time;
-        const size_t actual_duration = get_service_time(avg_refill_time, var_srvc[4]);
-        znsleep(actual_duration);
+        const size_t actual_duration = get_service_time(
+                                            avg_refill_time,
+                                            var_srvc[4]
+                                       );
 
-        sem_wait(shm_sem);
+        znsleep(actual_duration);
+        
+        sem_wait(ctx->sem.shm);
 
         it (loc_idx, 0, 2) {
             dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
@@ -114,35 +138,39 @@ main(void) {
                 *qty += refill;
                 if (*qty > max) *qty = max;
             }
-            
         }
-
-        sem_signal(shm_sem);
+        sem_signal(ctx->sem.shm);
     }
 
-
-    while(wait(NULL) > 0);
-
-    shmctl(shm_id, IPC_RMID, NULL);
-    shmctl(ctx->shmid_roles, IPC_RMID, NULL);
-    semctl(out_sem, 0, IPC_RMID);
-    semctl(shm_sem, 0, IPC_RMID);
-    it(i, 0, NOF_STATIONS)
-        msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
-
-    return 0;
-}
-
-void sim_day(simctx_t* ctx) {
-    assign_roles(ctx);
 }
 
 /* ========================== PROCESSES ========================== */ 
 
+void
+init_worker (
+    simctx_t* ctx,
+    shmid_t   ctx_id,
+    shmid_t   st_id,
+    loc_t     role
+) {
+    const pid_t pid = zfork();
+
+    if (pid == 0) {
+        char *args[] = {
+            "worker",
+            itos((int)ctx_id),
+            itos((int)st_id),
+            itos((int)role),
+            NULL 
+        };
+
+        execve("./bin/worker", args, NULL);
+        panic("ERROR: Execve failed launching a worker\n");
+    }
+}
+
 void init_client(
-    char *shmid,
-    char *out_sem,
-    char *tbl_sem
+    shmid_t ctx_id
 ) {
     const pid_t pid = zfork();
 
@@ -150,44 +178,11 @@ void init_client(
         char *args[] = {
             "client",
             rand()%2 ? "1":"0",
-            shmid,
-            out_sem,
-            tbl_sem,
+            itos((int)ctx_id),
             NULL
         };
         execve("./bin/client", args, NULL);
         panic("ERROR: Execve failed for client\n");
-    }
-}
-
-void init_worker(
-    simctx_t* ctx,
-    char*     shm_id,
-    size_t    idx,
-    char*     zprintf_sem,
-    char*     shm_sem,
-    char*     stations_id
-) {
-    const pid_t pid = zfork();
-
-    if (pid == 0) {
-        ctx->roles[idx].worker = getpid();
-
-        char str_role_idx[16];
-        sprintf(str_role_idx, "%zu", idx);
-        
-        char *args[] = {
-            "worker",
-            shm_id,
-            str_role_idx,
-            zprintf_sem,
-            shm_sem,
-            stations_id,
-            NULL 
-        };
-
-        execve("./bin/worker", args, NULL);
-        panic("ERROR: Execve failed for worker n. %zu\n", idx);
     }
 }
 
@@ -204,22 +199,10 @@ init_ctx(
     ctx->is_sim_running = true;
 
     load_config("data/config.json", &ctx->config);
-
-    size_t roles_size = sizeof(worker_role_t) * ctx->config.nof_workers;
-    
-    ctx->shmid_roles = zshmget(IPC_PRIVATE, roles_size, IPC_CREAT | SHM_RW);
-    
-    // Attacchiamo il puntatore nel processo padre (Main)
-    ctx->roles = (worker_role_t*)zshmat(ctx->shmid_roles);
-    
-    // Azzeriamo la memoria dei ruoli
-    memset(ctx->roles, 0, roles_size);
-
-    for (size_t i = 0; i < NOF_STATIONS; i++) {
+ 
+    it (i, 0, NOF_STATIONS)
         ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
-    }
 
-    // 6. Caricamento Menu
     load_menu("data/menu.json", ctx);
 
     // Inizializzazione piatti disponibili (Logica invariata)
@@ -232,59 +215,61 @@ init_ctx(
         }
     }
 
-    assign_roles(ctx);
+    ctx->sem.out = sem_init(1);
+    ctx->sem.shm = sem_init(1);
+    ctx->sem.day = sem_init(1);
+    ctx->sem.tbl = sem_init(ctx->config.nof_wk_seats[TABLE]);
+
+    // Inizializziamo la lista
+    g_priority_list[0] = FIRST_COURSE;
+    g_priority_list[1] = MAIN_COURSE;
+    g_priority_list[2] = COFFEE_BAR;
+    g_priority_list[3] = CHECKOUT;
+
+    size_t avg1, avg2;
+    it (i, 0, NOF_STATIONS) {
+        it (j, 0, NOF_STATIONS) {
+            avg1 = ctx->config.avg_srvc[g_priority_list[j]];
+            avg2 = ctx->config.avg_srvc[g_priority_list[i]];
+            if (avg1 > avg2) {
+                int temp = g_priority_list[i];
+                g_priority_list[i] = g_priority_list[j];
+                g_priority_list[j] = temp;
+            }
+        }
+    }
 
     return ctx;
 }
 
 void
 assign_roles(
-    simctx_t* ctx
+    simctx_t* ctx,
+    station* st
 ) {
+    // the num_workers will never be less than 4
+    // (the load_conf fun gives an error in that case)
     int num_workers = ctx->config.nof_workers;
+
+    it (i, 0, NOF_STATIONS)
+        st[i].wk_data.cap = 0;
+
+    st[FIRST_COURSE].wk_data.cap++;
+    st[MAIN_COURSE ].wk_data.cap++;
+    st[COFFEE_BAR  ].wk_data.cap++;
+    st[CHECKOUT    ].wk_data.cap++;
     
-    location_t *roles_buffer = malloc(sizeof(location_t) * num_workers);
-    if (!roles_buffer) panic("Malloc failed in assign_roles");
-
-    int assigned_count = 0;
-
-    if (num_workers >= 4) {
-        roles_buffer[assigned_count++] = FIRST_COURSE; // 0
-        roles_buffer[assigned_count++] = MAIN_COURSE;  // 1
-        roles_buffer[assigned_count++] = COFFEE_BAR;   // 2
-        roles_buffer[assigned_count++] = CHECKOUT;     // 3
+    it (i, 4, num_workers) {
+        loc_t target_station_id = g_priority_list[i % 4];
         
-    } else {
-        it(i,0, num_workers)
-            roles_buffer[assigned_count++] = (location_t)i;
+        st[target_station_id].wk_data.cap++;
     }
 
-    struct pair_station priority_list[4] = {
-        { FIRST_COURSE, ctx->config.avg_srvc[FIRST_COURSE] },
-        { MAIN_COURSE,  ctx->config.avg_srvc[MAIN_COURSE]  },
-        { COFFEE_BAR,   ctx->config.avg_srvc[COFFEE_BAR]   },
-        { CHECKOUT,     ctx->config.avg_srvc[CHECKOUT]     }
-    };
-
-    qsort(priority_list, 4, sizeof(struct pair_station), _compare_pair_station);
-
-    int p_index = 0;
-    while (assigned_count < num_workers) {
-        roles_buffer[assigned_count++] = priority_list[p_index].id;
-        p_index++;
-        if (p_index > 3) p_index = 0;
+    it (i, 0, NOF_STATIONS) {
+        st[i].wk_data.shmid = zshmget(
+                                IPC_PRIVATE,
+                                sizeof(worker_t) * st[i].wk_data.cap,
+                                IPC_CREAT | SHM_RW
+                              );
     }
-
-    for (int i = num_workers - 1; i > 0; i--) {
-        const int j = rand() % (i + 1);
-        const location_t temp = roles_buffer[i];
-        roles_buffer[i] = roles_buffer[j];
-        roles_buffer[j] = temp;
-    }
-
-    for (int i = 0; i < num_workers; i++) {
-        ctx->roles[i].role = roles_buffer[i];
-    }
-
-    free(roles_buffer);
 }

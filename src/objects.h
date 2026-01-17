@@ -14,6 +14,9 @@ union _semun {
     unsigned short *array;
 };
 
+typedef int    sem_t;
+typedef size_t shmid_t;
+
 // incorpora sia i tipi di stazioni sia dove puo' trovarsi un utente.
 // nel caso delle stazioni 'TABLE' e' ignorato
 typedef enum {
@@ -23,21 +26,20 @@ typedef enum {
     CHECKOUT     = 3,
     TABLE        = 4,
     EXIT         = 5
-} location_t;
+} loc_t;
 
 struct pair_station{
-    location_t id;
-    int avg_time;
+    loc_t id;
+    int   avg_time;
 };
 
 typedef struct {
-    pid_t      pid;
-    bool       active;
+    pid_t  pid;
 
-    location_t role;
-    size_t     queue;
+    loc_t  role;
+    size_t queue;
 
-    size_t     pause_time;  // cumulative time spent on pause
+    size_t pause_time;  // cumulative time spent on pause
 } worker_t;
 
 struct client_menu {
@@ -46,12 +48,12 @@ struct client_menu {
 };
 
 typedef struct {
-    pid_t      pid;
-    bool       ticket;
-    location_t loc;
-    bool       served;
-    size_t     msgq;
-    size_t     wait_time;
+    pid_t  pid;
+    bool   ticket;
+    loc_t  loc;
+    bool   served;
+    size_t msgq;
+    size_t wait_time;
     struct client_menu dishes;
 } client_t;
 
@@ -74,29 +76,34 @@ typedef enum {
 } dish_type;
 
 typedef struct {
-    size_t  worked_time;
-    size_t  wasted_time;
-    size_t  served_dishes;
-    size_t  left_dishes;
-    size_t  earnings; // 0 for all non checkout stations
+    size_t worked_time;
+    size_t wasted_time;
+    size_t served_dishes;
+    size_t left_dishes;
+    size_t earnings; // 0 for all non checkout stations
 } stats;
 
 typedef struct {
-    pid_t      worker;
-    location_t role;
+    pid_t worker;
+    loc_t role;
 } worker_role_t;
 
 typedef struct {
-    int        sem;
-    stats      stats;
-    location_t type;
+    // usato per aggiungere i worker e per le statistiche
+    sem_t sem;
+    stats stats;
+    loc_t type;
 
     struct {    
-        int shmid;
-        int cnt;
+        shmid_t shmid;
+        size_t  cnt;
+        size_t  cap;
+        // a run time inizializzato a config.nof_wk_seats[type]
+        // per gestire il massimo di lavoratori attivi (le pause)
+        sem_t   sem;
     } wk_data;
     
-    dish_t     menu[DISHES_COUNT];
+    dish_t    menu[DISHES_COUNT];
 } station;
 
 typedef struct {
@@ -141,7 +148,14 @@ typedef struct {
 
 typedef struct {
     stats  global_stats;
-    conf_t config; 
+    conf_t config;
+
+    struct semaphores {
+        sem_t shm;
+        sem_t day;
+        sem_t out;
+        sem_t tbl;
+    } sem;
 
     // Read && Write
     struct available_dishes {
@@ -156,9 +170,6 @@ typedef struct {
     } menu[3];
 
     size_t id_msg_q[NOF_STATIONS + 1];
-
-    int            shmid_roles;
-    worker_role_t  *roles;
 
     bool is_sim_running;
 

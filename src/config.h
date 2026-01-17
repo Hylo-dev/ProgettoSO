@@ -61,6 +61,10 @@ load_config(
     PARSE_INT(json, "OVERLOAD_THRESHOLD",   overload_threshold);
     
     PARSE_INT(json, "NOF_WORKERS",          nof_workers);
+    
+    if (conf->nof_workers < 4)
+        panic("CONFIG ERROR: Workers must be more than 3\n");
+    
     PARSE_INT(json, "NOF_USERS",            nof_users);
     PARSE_INT(json, "MAX_USERS_PER_GROUP",  max_users_per_group);
     PARSE_INT(json, "NOF_PAUSE",            nof_pause);

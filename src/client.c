@@ -74,12 +74,12 @@ pick_dishes(
 
 
 static dish_t
-get_dish_from_wk(
+ask_dish(
     const simctx_t*,
-          client_t,
-          msg_dish_t,
-          int,
-          msg_dish_t* 
+    client_t,
+    msg_dish_t,
+    int,
+    msg_dish_t* 
 );
 
 
@@ -89,7 +89,13 @@ main(
     char** argv
 ) {
     // argv must be:
-    // { exec name, bool ticket, shmid for the menu, zprint_sem, table_sem }
+    /* {
+     *    exec name,
+     *    ticket,
+     *    ctx_shmid,
+     *    zprint_sem,
+     *    table_sem
+     * } */
     if (argc != 5)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
@@ -139,18 +145,12 @@ main(
 
         switch (self.loc) {
             case FIRST_COURSE:
-                if (self.dishes.data[FIRST_COURSE] == -1)
-                    break;
-                
             case MAIN_COURSE:
-                if (self.loc == MAIN_COURSE && self.dishes.data[MAIN_COURSE] == -1)
-                    break;
-                
             case COFFEE_BAR:
-                if (self.loc == COFFEE_BAR && self.dishes.data[COFFEE_BAR] == -1)
+                if (self.dishes.data[self.loc] == -1)
                     break;
 
-                dish_t dish = get_dish_from_wk(
+                dish_t dish = ask_dish(
                     ctx,
                     self,
                     msg,
@@ -212,7 +212,7 @@ main(
 
 
 static dish_t
-get_dish_from_wk(
+ask_dish(
     const simctx_t*   ctx,
           client_t    self,
           msg_dish_t  msg,

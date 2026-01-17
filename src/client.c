@@ -38,7 +38,7 @@ pick_dishes(
         rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); // -1 ..< size
         if (rnd != -1) {
             cur_loc = FIRST_COURSE;
-            menu->data[FIRST] = ctx->menu[FIRST].elements[rnd].id;
+            menu->data[FIRST] = (ssize_t)ctx->menu[FIRST].elements[rnd].id;
             
         } else {
             cnt_nf++;
@@ -48,7 +48,7 @@ pick_dishes(
         rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); // -1 ..< size
         if (rnd != -1) {
             if (cur_loc == -1) cur_loc = MAIN;
-            menu->data[MAIN] = ctx->menu[MAIN].elements[rnd].id;
+            menu->data[MAIN] = (ssize_t)ctx->menu[MAIN].elements[rnd].id;
             
         } else {
             cnt_nf++;
@@ -58,7 +58,7 @@ pick_dishes(
         rnd = (ssize_t)(rand() % (ctx->menu[COFFEE].size + 1) - 1);
         if (rnd != -1) {
             if (cur_loc == -1) cur_loc = COFFEE;
-            menu->data[COFFEE] = ctx->menu[COFFEE].elements[rnd].id;
+            menu->data[COFFEE] = (ssize_t)ctx->menu[COFFEE].elements[rnd].id;
             
         } else {
             cnt_nf++;
@@ -69,7 +69,7 @@ pick_dishes(
 
     } while(cnt_nf == 3);
     
-    *loc = cur_loc;
+    *loc = (loc_t)cur_loc;
 }
 
 
@@ -85,8 +85,8 @@ ask_dish(
 
 int
 main(
-    int    argc,
-    char** argv
+    const int    argc,
+          char** argv
 ) {
     // argv must be:
     /* {
@@ -94,7 +94,7 @@ main(
      *    ticket,
      *    ctx_shmid,
      * } */
-    if (argc != 5)
+    if (argc != 3)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
     const bool   ticket  = atob(argv[1]);
@@ -121,7 +121,7 @@ main(
     };
         
     msg_t response;
-    int        price;
+    int   price = 0; // Settato zero perche' senno' dopo con `+=` esplode :)
 
     while (ctx->is_sim_running) {
         if (self.loc < NOF_STATIONS)
@@ -135,11 +135,11 @@ main(
                         TICKET : DEFAULT,
             .client = self.pid,
             .dish   = {
-                self.loc < 3 ? self.dishes.data[self.loc] : 0,
+                self.loc < 3 ? (size_t)self.dishes.data[self.loc] : 0,
                 "", 0, 0
             },
             .status = REQUEST_OK,
-            .price  = self.loc == CHECKOUT ? price : 0
+            .price  = self.loc == CHECKOUT ? (size_t)price : 0
         };
 
         switch (self.loc) {
@@ -149,7 +149,7 @@ main(
                 if (self.dishes.data[self.loc] == -1)
                     break;
 
-                dish_t dish = ask_dish(
+                const dish_t dish = ask_dish(
                     ctx,
                     self,
                     msg,
@@ -157,8 +157,8 @@ main(
                     &response
                 );
 
-                price += dish.price;
-                self.dishes.data[self.loc] = dish.id;
+                price += (int)dish.price;
+                self.dishes.data[self.loc] = (int)dish.id;
                 
                 break;
 
@@ -212,11 +212,11 @@ main(
 
 static dish_t
 ask_dish(
-    const simctx_t*   ctx,
-          client_t    self,
-          msg_t  msg,
-          int         zpr_sem,
-          msg_t* response
+    const simctx_t *ctx,
+          client_t  self,
+          msg_t     msg,
+    const int       zpr_sem,
+          msg_t    *response
 ) {
     do {
         send_msg(
@@ -227,8 +227,8 @@ ask_dish(
 
         zprintf(
             zpr_sem,
-            "CLIENT: %d, %d, WAITING\n",
-            self.pid, self.msgq
+            "CLIENT: id %d, loc %d, WAITING\n",
+            self.pid, self.loc
         );
 
         recive_msg(self.msgq, self.pid, response);

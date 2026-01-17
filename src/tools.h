@@ -24,9 +24,9 @@ typedef const void* let_any;
 
 #define it(var, start, end) \
     for ( \
-        int var = (int)(start); \
-        var != (int)(end); \
-        var += ((int)(start) < (int)(end) ? 1 : -1)\
+        int (var) = (int)(start); \
+        (var) != (int)(end); \
+        (var) += ((int)(start) < (int)(end) ? 1 : -1)\
     )
 
 static inline void
@@ -129,7 +129,7 @@ zmsgget(
 }
 
 static inline sem_t
-sem_init(int val) {
+sem_init(const int val) {
     int sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
     
     if (sem_id == -1)
@@ -146,27 +146,51 @@ sem_init(int val) {
 
 // Operazione P: Decrementa (Wait)
 static inline void
-sem_wait(sem_t sem_id) {
+sem_wait(const sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num =  0;
     sb.sem_op  = -1;
     sb.sem_flg =  0;
 
     if (semop(sem_id, &sb, 1) == -1) 
-        panic("ERROR: `sem_wait` failed");
+        panic("ERROR: sem_wait failed, id %d\n", sem_id);
 }
 
 // Operaxzione V: Incrementa (Signal)
 static inline void
-sem_signal(sem_t sem_id) {
+sem_signal(const sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num = 0;
     sb.sem_op  = 1;
     sb.sem_flg = 0;
 
     if (semop(sem_id, &sb, 1) == -1)
-        panic("ERROR: `sem_wait` failed");
+        panic("ERROR: sem_signal failed, id %d\n", sem_id);
 
+}
+
+// Operazione: Setta un valore al semaforo
+static inline void
+set_sem(
+    const sem_t id,
+    const int   val
+) {
+    union _semun arg;
+    arg.val = val;
+    if (semctl(id, 0, SETVAL, arg) == -1)
+        panic("ERROR: set_sem failed\n");
+}
+
+// Operazione: Aspetta che il sem sia = 0
+static inline void
+sem_wait_zero(const sem_t id) {
+    struct sembuf sem_b;
+    sem_b.sem_num = 0;
+    sem_b.sem_op  = 0; // Usato per indicare di settarlo a zero
+    sem_b.sem_flg = 0;
+
+    if (semop(id, &sem_b, 1) == -1)
+        panic("ERROR: sem_wait_zero failed\n");
 }
 
 static void
@@ -233,7 +257,7 @@ atob(const char* str) {
 }
 
 static inline char*
-itos(int val) {
+itos(const int val) {
     static char buffers[4][12]; 
     static int idx = 0;
 
@@ -253,9 +277,9 @@ get_service_time(
 ) {
     if (avg_time == 0) return 0;
 
-    size_t delta     = (avg_time * percent) / 100;
-    long   variation = (rand() % (2 * delta + 1)) - delta;
-    long   result    = (long)avg_time - variation;
+    const size_t delta     = (avg_time * percent) / 100;
+    const long   variation = (long)(rand() % (2 * delta + 1) - delta);
+    const long   result    = (long)avg_time - variation;
     
     return (result > 0) ? (size_t)result : 0;
 }

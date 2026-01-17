@@ -24,14 +24,14 @@ static int g_priority_list[4];
 
 /* Prototipi */
 void init_client  (shmid_t);
-void init_worker  (simctx_t*, shmid_t, shmid_t, loc_t);
-void sim_day      (simctx_t*, shmid_t, station*, shmid_t);
-void assign_roles (simctx_t*, station*);
-simctx_t* init_ctx(const size_t);
+void init_worker  (shmid_t, shmid_t, loc_t);
+void sim_day      (simctx_t *, station *, size_t);
+void assign_roles (const simctx_t*, station*);
+simctx_t* init_ctx(size_t);
 
 int _compare_pair_station(const void* a, const void* b) {
-    const struct pair_station* first  = (const struct pair_station*)a;
-    const struct pair_station* second = (const struct pair_station*)b;
+    const struct pair_station* first  = a;
+    const struct pair_station* second = b;
     return (second->avg_time - first->avg_time);
 }
 
@@ -49,6 +49,18 @@ main(void) {
 
     simctx_t* ctx = init_ctx(shm_id);
 
+    // sem_t shm;
+    // sem_t day;
+    // sem_t out;
+    // sem_t tbl;
+    // sem_t wall;
+    printf("shm: %d\n", ctx->sem.shm);
+    printf("day: %d\n", ctx->sem.day);
+    printf("out: %d\n", ctx->sem.out);
+    printf("tbl: %d\n", ctx->sem.tbl);
+    printf("wall: %d\n", ctx->sem.wall);
+    printf("\n");
+
     const size_t
     shm_stations_id = zshmget(
                           IPC_PRIVATE,
@@ -57,80 +69,90 @@ main(void) {
                       );
 
     station *st = get_stations(shm_stations_id);
-    memset(st, NOF_STATIONS, sizeof(station));
+    memset(st, 0, sizeof(station) * NOF_STATIONS);
+    // In src/main.c dentro il main()
+
     it (i, 0, NOF_STATIONS) {
-        st[i].type = (loc_t)i;
+        st[i].type        = (loc_t)i;
+        st[i].sem         = sem_init(1);
         st[i].wk_data.sem = sem_init(ctx->config.nof_wk_seats[i]);
-        
-        it (j, 0, ctx->menu[i].size) 
-            st[i].menu[j] = ctx->menu[i].elements[j];
 
-        
-        // size_t nworkers = ctx->config.nof_wk_seats[i];
-        // st[i].wk_data.shmid = zshmget(
-        //                         IPC_PRIVATE,
-        //                         sizeof(worker_t) * nworkers,
-        //                         IPC_CREAT | SHM_RW
-        //                       );
-        
+        st[i].wk_data.shmid = zshmget(
+            IPC_PRIVATE,
+            sizeof(worker_t) * ctx->config.nof_workers,
+            IPC_CREAT | SHM_RW
+        );
 
+        if (i < CHECKOUT) {
+            it (j, 0, ctx->menu[i].size)
+                st[i].menu[j] = ctx->menu[i].elements[j];
+        }
     }
 
     it (i, 0, ctx->config.nof_users)
         init_client(shm_id);
+
+    assign_roles(ctx, st);
+    it (type, 0, NOF_STATIONS) {
+        const size_t cnt = st[type].wk_data.cap;
+
+        it (k, 0, cnt)
+            init_worker(shm_id, shm_stations_id, (loc_t)type);
+    }
     
     it(i, 0, ctx->config.sim_duration)
-        sim_day(ctx, shm_id, st, shm_stations_id);
+        sim_day(ctx, st, i);
 
+    ctx->is_sim_running = false;
 
+    printf("MAIN: Fine sim\n");
+    // Libera i wk così muoiono
+    set_sem(ctx->sem.wall, ctx->config.nof_workers);
     while(wait(NULL) > 0);
 
-    shmctl(shm_id, IPC_RMID, NULL);
+    shmctl((int)shm_id, IPC_RMID, NULL);
     semctl(ctx->sem.out, 0, IPC_RMID);
     semctl(ctx->sem.tbl, 0, IPC_RMID);
     semctl(ctx->sem.shm, 0, IPC_RMID);
     semctl(ctx->sem.day, 0, IPC_RMID);
     it(i, 0, NOF_STATIONS)
-        msgctl(ctx->id_msg_q[i], IPC_RMID, NULL);
+        msgctl((int)ctx->id_msg_q[i], IPC_RMID, NULL);
 
     return 0;
 }
 
 void sim_day(
-    simctx_t* ctx,
-    shmid_t   ctx_id,
-    station*  stations,
-    shmid_t   st_id
+          simctx_t *ctx,
+          station  *stations,
+    const size_t    day
 ) {
-    assign_roles(ctx, stations);
+    if (day > 0) assign_roles(ctx, stations);
 
-    it (type, 0, NOF_STATIONS) {
-        int cnt = stations[type].wk_data.cap;
+    printf("MAIN: Inizio giornata\n");
+    ctx->is_day_running = true;
 
-        it (k, 0, cnt)
-            init_worker(ctx, ctx_id, st_id, (loc_t)type);
-    }
+    // Settato per la quantita di wk attivi
+    set_sem(ctx->sem.day,  ctx->config.nof_workers);
+    set_sem(ctx->sem.wall, ctx->config.nof_workers);
 
-    while (ctx->is_sim_running) {
-        znsleep(600);
-
-        if (!ctx->is_sim_running) break;
-
-        const size_t avg_refill_time = ctx->config.avg_refill_time;
+    size_t min = 0;
+    const size_t avg_refill_time = ctx->config.avg_refill_time;
+    while (ctx->is_sim_running && min < WORK_DAY_MINUTES) {
         const size_t actual_duration = get_service_time(
                                             avg_refill_time,
                                             var_srvc[4]
                                        );
 
         znsleep(actual_duration);
+
+        min += avg_refill_time;
         
         sem_wait(ctx->sem.shm);
-
         it (loc_idx, 0, 2) {
-            dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
-            size_t            size_avl = ctx->available_dishes[loc_idx].size;
-            size_t            max      = ctx->config.max_porzioni[loc_idx];
-            size_t            refill   = ctx->config.avg_refill[loc_idx];
+                  dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
+            const size_t            size_avl = ctx->available_dishes[loc_idx].size;
+            const size_t            max      = ctx->config.max_porzioni[loc_idx];
+            const size_t            refill   = ctx->config.avg_refill[loc_idx];
             
             it (j, 0, size_avl) {
                 size_t* qty = &elem_avl[j].quantity;
@@ -141,17 +163,24 @@ void sim_day(
         }
         sem_signal(ctx->sem.shm);
     }
+    ctx->is_day_running = false;
+    printf("MAIN: Fine giornata\n");
 
+    printf("MAIN: Reset day sem\n");
+    sem_wait_zero(ctx->sem.day);
+    printf("MAIN: Reset wall sem\n");
+    sem_wait_zero(ctx->sem.wall);
+
+    printf("MAIN: Stats da implementare\n");
 }
 
 /* ========================== PROCESSES ========================== */ 
 
 void
 init_worker (
-    simctx_t* ctx,
-    shmid_t   ctx_id,
-    shmid_t   st_id,
-    loc_t     role
+    const shmid_t ctx_id,
+    const shmid_t st_id,
+    const loc_t   role
 ) {
     const pid_t pid = zfork();
 
@@ -160,7 +189,7 @@ init_worker (
             "worker",
             itos((int)ctx_id),
             itos((int)st_id),
-            itos((int)role),
+            itos(role),
             NULL 
         };
 
@@ -169,9 +198,7 @@ init_worker (
     }
 }
 
-void init_client(
-    shmid_t ctx_id
-) {
+void init_client(const shmid_t ctx_id) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
@@ -205,20 +232,24 @@ init_ctx(
 
     load_menu("data/menu.json", ctx);
 
-    // Inizializzazione piatti disponibili (Logica invariata)
     it (loc, 0, 3){
-        struct available_dishes dishes = ctx->available_dishes[loc];
+        struct available_dishes *dishes = &ctx->available_dishes[loc];
         it (i, 0, ctx->menu[loc].size) {
-            dishes.elements[i].id = ctx->menu[loc].elements[i].id;
-            dishes.elements[i].quantity = ctx->config.avg_refill[loc];
-            dishes.size++;
+            dishes->elements[i].id = ctx->menu[loc].elements[i].id;
+
+            if (loc < COFFEE) {
+                dishes->elements[i].quantity = ctx->config.avg_refill[loc];
+
+            } else { dishes->elements[i].quantity = 99999; }
+            dishes->size++;
         }
     }
 
-    ctx->sem.out = sem_init(1);
-    ctx->sem.shm = sem_init(1);
-    ctx->sem.day = sem_init(1);
-    ctx->sem.tbl = sem_init(ctx->config.nof_wk_seats[TABLE]);
+    ctx->sem.out  = sem_init(1);
+    ctx->sem.shm  = sem_init(1);
+    ctx->sem.day  = sem_init(0);
+    ctx->sem.tbl  = sem_init(ctx->config.nof_wk_seats[TABLE]);
+    ctx->sem.wall = sem_init(0);
 
     // Inizializziamo la lista
     g_priority_list[0] = FIRST_COURSE;
@@ -244,32 +275,33 @@ init_ctx(
 
 void
 assign_roles(
-    simctx_t* ctx,
-    station* st
+    const simctx_t *ctx,
+          station  *st
 ) {
     // the num_workers will never be less than 4
     // (the load_conf fun gives an error in that case)
-    int num_workers = ctx->config.nof_workers;
-
-    it (i, 0, NOF_STATIONS)
+    it (i, 0, NOF_STATIONS) {
+        st[i].wk_data.cnt = 0;
         st[i].wk_data.cap = 0;
+    }
 
+    const int num_workers = ctx->config.nof_workers;
     st[FIRST_COURSE].wk_data.cap++;
     st[MAIN_COURSE ].wk_data.cap++;
     st[COFFEE_BAR  ].wk_data.cap++;
     st[CHECKOUT    ].wk_data.cap++;
     
     it (i, 4, num_workers) {
-        loc_t target_station_id = g_priority_list[i % 4];
+        const loc_t target_station_id = g_priority_list[i % 4];
         
         st[target_station_id].wk_data.cap++;
     }
 
-    it (i, 0, NOF_STATIONS) {
-        st[i].wk_data.shmid = zshmget(
-                                IPC_PRIVATE,
-                                sizeof(worker_t) * st[i].wk_data.cap,
-                                IPC_CREAT | SHM_RW
-                              );
-    }
+    // it (i, 0, NOF_STATIONS) {
+    //     st[i].wk_data.shmid = zshmget(
+    //                             IPC_PRIVATE,
+    //                             sizeof(worker_t) * st[i].wk_data.cap,
+    //                             IPC_CREAT | SHM_RW
+    //                           );
+    // }
 }

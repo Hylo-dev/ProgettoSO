@@ -155,6 +155,7 @@ typedef struct {
         sem_t day;
         sem_t out;
         sem_t tbl;
+        sem_t wall;
     } sem;
 
     // Read && Write
@@ -172,6 +173,7 @@ typedef struct {
     size_t id_msg_q[NOF_STATIONS + 1];
 
     bool is_sim_running;
+    bool is_day_running;
 
 } simctx_t;
 

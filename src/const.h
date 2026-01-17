@@ -14,10 +14,12 @@
 
 /* =================== SIM. DURATION =================== */
 #define SIM_DURATION 5 /* days */
-#define N_NANO_SECS 5 /* number of real ns for a minute in the sim */
+#define WORK_DAY_MINUTES 480 /* 8h */
+#define N_NANO_SECS 10000000 /* old: 5, number of real ns for a minute in the sim */
+#include <stddef.h>
 
 /* =================== AVERAGE TIMES =================== */
-static double var_srvc[] = {
+static size_t var_srvc[] = {
     50, // VAR_SRVC_FIRST_COURSE 
     50, // VAR_SRVC_MAIN_COURSE 
     80, // VAR_SRVC_COFFEE 

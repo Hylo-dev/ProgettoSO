@@ -42,97 +42,124 @@ main(
 
     /* ====================== INIT ======================= */
     
-    const shmid_t   ctx_id  = atos(argv[1]);
-    const shmid_t   sts_id  = atos(argv[2]);
-    const size_t    role    = atos(argv[3]);
+    const shmid_t   ctx_id  =        atos(argv[1]);
+    const shmid_t   sts_id  =        atos(argv[2]);
+    const loc_t     role    = (loc_t)atos(argv[3]);
 
-          simctx_t* ctx     = get_ctx(ctx_id);
-          station*  st      = get_station(sts_id, role);
-          worker_t* wks     = get_workers(st->wk_data.shmid);
+    while (true) {
+        // Aspetta l'inizio della giornata
+        simctx_t* ctx = get_ctx(ctx_id);
 
-    const sem_t     shm_sem = ctx->sem.shm;
-    const sem_t     out_sem = ctx->sem.out; 
+        zprintf(
+            ctx->sem.out,
+            "WORKER: WAITING INIT DAY\n"
+        );
+        sem_wait(ctx->sem.wall);
 
-    const size_t    queue   = ctx->id_msg_q[role];
-
-          double    variance = var_srvc[role];
-          msg_t     response;
-          size_t    services;
-    
-    // attatch self to the mem area in the shm
-    sem_wait(st->sem);
-    size_t idx = st->wk_data.cnt++;
-    wks[idx] = (worker_t) {
-        .pid        = getpid(),
-        .role       = role,
-        .pause_time = 0,
-        .queue      = queue,
-    };
-    worker_t *self  = &wks[idx];
-    sem_signal(st->sem);
-
-    /* ===================  WORK LOOP ==================== */
-    while (ctx->is_sim_running) {
-
-        /* ================== SEM OWNERSHIP ================== */
-        struct timespec t_start, t_end;
-        clock_gettime(CLOCK_REALTIME, &t_start); 
-        sem_wait(st->wk_data.sem); 
-        clock_gettime(CLOCK_REALTIME, &t_end);
-        long wait_ns = (t_end.tv_sec - t_start.tv_sec) * 1000000000L + 
-                       (t_end.tv_nsec - t_start.tv_nsec);
-        self->pause_time += wait_ns;
-
-        services = 0;
-        
-        /* ====================== WORK ====================== */
-        while (ctx->is_sim_running) {
-                    
-            recive_msg(self->queue, -DEFAULT, &response);
-
-            switch (self->role) {
-                case COFFEE_BAR:
-                case FIRST_COURSE:
-                case MAIN_COURSE:
-                case CHECKOUT:
-                    serve_client( self, ctx, st, &response, variance );
-                    break;
-                case TABLE:
-                case EXIT:
-                    panic("ERROR: Invalid worker arguments for pid: %d\n",
-                          getpid());
-            }
-
-            response.mtype = response.client;
-            send_msg(
-                self->queue,
-                response,
-                sizeof(msg_t) - sizeof(long)
-            );
-
-            services++;
-
-            // CHECK_PAUSA: if the served clients are at least nof_pause
-            // leaves the shift
-            if (services >= ctx->config.nof_pause) {
-                zprintf(ctx->sem.out, "Worker %d va in pausa dopo %d servizi\n", 
-                        getpid(), services);
-                break; 
-            }
-        }
-
-        // 3. RILASCIO IL POSTO (Fine Turno)
-        // ------------------------------------------------
-        sem_signal(st->wk_data.sem);
-        
         if (!ctx->is_sim_running) break;
 
-        self->pause_time += ctx->config.stop_duration; 
-        
-        znsleep(ctx->config.stop_duration);
-    }
+        station  *st  = get_station(sts_id, role);
+        worker_t *wks = get_workers(st->wk_data.shmid);
+        // const sem_t     shm_sem = ctx->sem.shm;
+        // const sem_t     out_sem = ctx->sem.out;
 
-    sem_signal(st->wk_data.sem);
+        const size_t    queue    = ctx->id_msg_q[role];
+        const size_t    variance = var_srvc[role];
+              msg_t     response;
+              size_t    services;
+
+        // attatch self to the mem area in the shm
+        sem_wait(st->sem);
+        const size_t idx = st->wk_data.cnt++;
+        wks[idx] = (worker_t) {
+            .pid        = getpid(),
+            .role       = role,
+            .pause_time = 0,
+            .queue      = queue,
+        };
+        worker_t *self  = &wks[idx];
+        sem_signal(st->sem);
+
+
+        /* ===================  WORK LOOP ==================== */
+        while (ctx->is_sim_running && ctx->is_day_running) {
+
+            zprintf(
+                ctx->sem.out,
+                "WORKER: id %d, role %d, WAITING\n",
+                self->pid, self->role
+            );
+
+            /* ================== SEM OWNERSHIP ================== */
+            struct timespec t_start, t_end;
+            clock_gettime(CLOCK_REALTIME, &t_start);
+            sem_wait(st->wk_data.sem);
+            clock_gettime(CLOCK_REALTIME, &t_end);
+            const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * 1000000000L +
+                           (t_end.tv_nsec - t_start.tv_nsec);
+            self->pause_time += (size_t)wait_ns;
+
+            services = 0;
+
+            /* ====================== WORK ====================== */
+            while (ctx->is_sim_running && ctx->is_day_running) {
+
+                // Cambiato per questa funzione così non
+                // è bloccante e si può controllare l'uscita dei workers
+                const ssize_t res = recv_msg_nw(self->queue, -DEFAULT, &response);
+                if (res == -1) {
+                    usleep(10000);
+                    continue; // Controlla di nuovo se la sim è finita
+                }
+
+                switch (self->role) {
+                    case COFFEE_BAR:
+                    case FIRST_COURSE:
+                    case MAIN_COURSE:
+                    case CHECKOUT:
+                        serve_client( self, ctx, st, &response, variance );
+                        break;
+                    case TABLE:
+                    case EXIT:
+                        panic("ERROR: Invalid worker arguments for pid: %d\n",
+                              getpid());
+                }
+
+                response.mtype = response.client;
+                send_msg(
+                    self->queue,
+                    response,
+                    sizeof(msg_t) - sizeof(long)
+                );
+
+                services++;
+
+                // CHECK_PAUSA: if the served clients are at least nof_pause
+                // leaves the shift
+                if (services >= (size_t)ctx->config.nof_pause) {
+                    zprintf(ctx->sem.out, "Worker %d va in pausa dopo %d servizi\n",
+                            getpid(), services);
+                    break;
+                }
+            }
+
+            // 3. RILASCIO IL POSTO (Fine Turno)
+            // ------------------------------------------------
+            sem_signal(st->wk_data.sem);
+
+            if (!ctx->is_sim_running || !ctx->is_day_running) break;
+
+            self->pause_time += (size_t)ctx->config.stop_duration;
+            znsleep((size_t)ctx->config.stop_duration);
+        }
+
+        sem_wait(ctx->sem.day);
+        if (!ctx->is_sim_running) {
+            zprintf(ctx->sem.out, "WORKER %d: Simulazione finita, esco.\n", getpid());
+            break;
+        }
+    }
+    
     return 0;
 }
 

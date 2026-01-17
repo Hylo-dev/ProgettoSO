@@ -92,9 +92,13 @@ main(void) {
 
     while (ctx->is_sim_running) {
 
-        znsleep(10);
+        znsleep(600);
 
         if (!ctx->is_sim_running) break;
+
+        const size_t avg_refill_time = ctx->config.avg_refill_time;
+        const size_t actual_duration = get_service_time(avg_refill_time, var_srvc[4]);
+        znsleep(actual_duration);
 
         sem_wait(shm_sem);
 

@@ -25,12 +25,6 @@ serve_client(
     const double         
 );
 
-size_t
-get_service_time(
-    size_t,
-    size_t  
-);
-
 int
 main(
     int    argc,
@@ -97,20 +91,6 @@ main(
         response.mtype = response.client;
         send_msg(self->queue, response, sizeof(msg_dish_t) - sizeof(long));
     }
-}
-
-size_t
-get_service_time(
-    size_t avg_time,
-    size_t percent
-) {
-    if (avg_time == 0) return 0;
-
-    size_t delta     = (avg_time * percent) / 100;
-    long   variation = (rand() % (2 * delta + 1)) - delta;
-    long   result    = (long)avg_time - variation;
-    
-    return (result > 0) ? (size_t)result : 0;
 }
 
 static inline void

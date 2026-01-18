@@ -291,4 +291,9 @@ get_service_time(
 }
 
 
+
+static inline void
+handle_signal(int sig) { }
+
+
 #endif

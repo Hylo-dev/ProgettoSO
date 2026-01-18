@@ -25,8 +25,6 @@ serve_client(
           double
 );
 
-void handle_signal(int sig) { }
-
 int
 main(
     int    argc,
@@ -52,7 +50,7 @@ main(
     struct sigaction sa;
     sa.sa_handler = handle_signal;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
+    sa.sa_flags   = 0;
     sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {

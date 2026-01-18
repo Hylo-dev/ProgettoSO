@@ -146,12 +146,13 @@ typedef struct {
     stats  global_stats;
     conf_t config;
 
-    struct semaphores {
+    struct {
         sem_t shm;
-        sem_t wk_end;
         sem_t out;
         sem_t tbl;
         sem_t wall;
+        sem_t wk_end;
+        sem_t cl_end;
     } sem;
 
     // Read && Write

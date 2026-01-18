@@ -50,11 +50,12 @@ main(void) {
 
     simctx_t* ctx = init_ctx(shm_id);
 
-    printf("shm: %d\n",  ctx->sem.shm);
-    printf("day: %d\n",  ctx->sem.wk_end);
-    printf("out: %d\n",  ctx->sem.out);
-    printf("tbl: %d\n",  ctx->sem.tbl);
-    printf("wall: %d\n", ctx->sem.wall);
+    printf("shm:    %d\n", ctx->sem.shm   );
+    printf("out:    %d\n", ctx->sem.out   );
+    printf("tbl:    %d\n", ctx->sem.tbl   );
+    printf("wall:   %d\n", ctx->sem.wall  );
+    printf("wk_end: %d\n", ctx->sem.wk_end);
+    printf("cl_end: %d\n", ctx->sem.cl_end);
     printf("\n");
 
     const size_t
@@ -108,10 +109,13 @@ main(void) {
     while(wait(NULL) > 0);
 
     shmctl((int)shm_id, IPC_RMID, NULL);
-    semctl(ctx->sem.out, 0, IPC_RMID);
-    semctl(ctx->sem.tbl, 0, IPC_RMID);
-    semctl(ctx->sem.shm, 0, IPC_RMID);
+    semctl(ctx->sem.shm   , 0, IPC_RMID);
+    semctl(ctx->sem.out   , 0, IPC_RMID);
+    semctl(ctx->sem.tbl   , 0, IPC_RMID);
+    semctl(ctx->sem.wall  , 0, IPC_RMID);
     semctl(ctx->sem.wk_end, 0, IPC_RMID);
+    semctl(ctx->sem.cl_end, 0, IPC_RMID);
+
     it(i, 0, NOF_STATIONS)
         msgctl((int)ctx->id_msg_q[i], IPC_RMID, NULL);
 
@@ -129,8 +133,9 @@ void sim_day(
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
-    set_sem(ctx->sem.wk_end, ctx->config.nof_workers);
     set_sem(ctx->sem.wall,   ctx->config.nof_workers);
+    set_sem(ctx->sem.wk_end, ctx->config.nof_workers);
+    set_sem(ctx->sem.cl_end, ctx->config.nof_users  );
 
     size_t min = 0;
     const size_t avg_refill_time = ctx->config.avg_refill_time;
@@ -174,6 +179,7 @@ void sim_day(
 
     printf("MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.wk_end);
+    sem_wait_zero(ctx->sem.cl_end);
 
     printf("MAIN: Stats da implementare\n");
 }
@@ -251,11 +257,12 @@ init_ctx(
         }
     }
 
-    ctx->sem.out  = sem_init(1);
-    ctx->sem.shm  = sem_init(1);
-    ctx->sem.wk_end  = sem_init(0);
-    ctx->sem.wall = sem_init(0);
-    ctx->sem.tbl  = sem_init(ctx->config.nof_tbl_seats);
+    ctx->sem.out    = sem_init(1);
+    ctx->sem.shm    = sem_init(1);
+    ctx->sem.wk_end = sem_init(0);
+    ctx->sem.cl_end = sem_init(0);
+    ctx->sem.wall   = sem_init(0);
+    ctx->sem.tbl    = sem_init(ctx->config.nof_tbl_seats);
 
     // Inizializziamo la lista
     g_priority_list[0] = FIRST_COURSE;

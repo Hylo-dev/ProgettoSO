@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
 // NOTE: The client will always pick a maximum of one
 //       dish for the FIRST and one for the MAIN
@@ -24,7 +25,6 @@ ask_dish(
     const simctx_t*,
     client_t,
     msg_t,
-    int,
     msg_t* 
 );
 
@@ -32,8 +32,6 @@ ask_dish(
 void
 send_request(
     const simctx_t*,
-    const sem_t,
-    const sem_t,
           client_t,
           msg_t*,
           int*
@@ -54,19 +52,27 @@ main(
     if (argc != 3)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
+    /* ====================== INIT ======================= */
+
     const bool   ticket  = atob(argv[1]);
     const size_t shmid   = atos(argv[2]);
 
+
+    struct sigaction sa;
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags   = 0;
+    sigaction(SIGUSR1, &sa, NULL);
+
     while (true) {
+
         const simctx_t *ctx = get_ctx(shmid);
+
         zprintf(
             ctx->sem.out,
             "CLIENT: Waiting new day\n"
         );
         sem_wait(ctx->sem.wall);
-
-        const sem_t out_sem = ctx->sem.out;
-        const sem_t tbl_sem = ctx->sem.tbl;
 
         client_t self  = {
             .pid       = getpid(),
@@ -84,7 +90,7 @@ main(
         int   price = 0;
 
         /* =============== BEGIN OF REQUEST LOOP ============== */
-        send_request(ctx, out_sem, tbl_sem, self, &response, &price);
+        send_request(ctx, self, &response, &price);
 
         if (!ctx->is_sim_running) {
             zprintf(ctx->sem.out, "CLIENT %d: Giornata finita, esco.\n", getpid());
@@ -141,8 +147,6 @@ pick_dishes(
 void
 send_request(
     const simctx_t *ctx,
-    const sem_t     out_sem,
-    const sem_t     tbl_sem,
           client_t  self,
           msg_t    *response,
           int      *price
@@ -177,7 +181,6 @@ send_request(
                     ctx,
                     self,
                     msg,
-                    out_sem,
                     response
                 );
 
@@ -195,15 +198,15 @@ send_request(
 
             case TABLE:
                 zprintf(
-                    out_sem,
+                    ctx->sem.out,
                     "CLIENT: %d, %d, WAITING TABLE\n",
                     self.pid, self.loc
                 );
 
-                sem_wait(tbl_sem);
+                sem_wait(ctx->sem.tbl);
 
                 zprintf(
-                    out_sem,
+                    ctx->sem.out,
                     "CLIENT %d: Found table, Eating for %zu ns\n",
                     self.pid,
                     self.wait_time
@@ -211,16 +214,16 @@ send_request(
                 znsleep(self.wait_time);
 
                 zprintf(
-                    out_sem,
+                    ctx->sem.out,
                     "CLIENT %d: Leaving table\n",
                     self.pid
                 );
-                sem_signal(tbl_sem);
+                sem_signal(ctx->sem.tbl);
                 break;
 
             case EXIT:
                 zprintf(
-                    out_sem,
+                    ctx->sem.out,
                     "CLIENT: %d, EXIT\n",
                     self.pid
                 );
@@ -237,7 +240,6 @@ ask_dish(
     const simctx_t *ctx,
           client_t  self,
           msg_t     msg,
-    const int       zpr_sem,
           msg_t    *response
 ) {
     do {
@@ -248,7 +250,7 @@ ask_dish(
         );
 
         zprintf(
-            zpr_sem,
+            ctx->sem.out,
             "CLIENT: id %d, loc %d, WAITING\n",
             self.pid, self.loc
         );
@@ -256,7 +258,7 @@ ask_dish(
         recive_msg(self.msgq, self.pid, response);
 
         zprintf(
-            zpr_sem,
+            ctx->sem.out,
             "CLIENT: %d, SERVED\n",
             self.pid
         );

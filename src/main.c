@@ -104,8 +104,8 @@ main(void) {
         sim_day(ctx, st, i);
 
     ctx->is_sim_running = false;
-
     printf("MAIN: Fine sim\n");
+
     // Libera i wk così muoiono
     set_sem(ctx->sem.wall, ctx->config.nof_workers);
     while(wait(NULL) > 0);
@@ -163,13 +163,20 @@ void sim_day(
         }
         sem_signal(ctx->sem.shm);
     }
-    ctx->is_day_running = false;
     printf("MAIN: Fine giornata\n");
+    ctx->is_day_running = false;
+
+    it(i, 0, NOF_STATIONS) {
+        const worker_t *wks = get_workers(stations[i].wk_data.shmid);
+        it(j, 0, stations[i].wk_data.cap) {
+            if (wks[j].pid > 0) {
+                kill(wks[j].pid, SIGUSR1);
+            }
+        }
+    }
 
     printf("MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.day);
-    printf("MAIN: Reset wall sem\n");
-    sem_wait_zero(ctx->sem.wall);
 
     printf("MAIN: Stats da implementare\n");
 }
@@ -248,8 +255,8 @@ init_ctx(
     ctx->sem.out  = sem_init(1);
     ctx->sem.shm  = sem_init(1);
     ctx->sem.day  = sem_init(0);
-    ctx->sem.tbl  = sem_init(ctx->config.nof_wk_seats[TABLE]);
     ctx->sem.wall = sem_init(0);
+    ctx->sem.tbl  = sem_init(ctx->config.nof_wk_seats[TABLE]);
 
     // Inizializziamo la lista
     g_priority_list[0] = FIRST_COURSE;

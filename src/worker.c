@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "const.h"
 #include "msg.h"
@@ -25,6 +25,8 @@ serve_client(
     const double
 );
 
+void handle_signal(int sig) { }
+
 int
 main(
     int    argc,
@@ -45,6 +47,12 @@ main(
     const shmid_t   ctx_id  =        atos(argv[1]);
     const shmid_t   sts_id  =        atos(argv[2]);
     const loc_t     role    = (loc_t)atos(argv[3]);
+
+    struct sigaction sa;
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {
         // Aspetta l'inizio della giornata
@@ -80,7 +88,6 @@ main(
         worker_t *self  = &wks[idx];
         sem_signal(st->sem);
 
-
         /* ===================  WORK LOOP ==================== */
         while (ctx->is_sim_running && ctx->is_day_running) {
 
@@ -104,12 +111,9 @@ main(
             /* ====================== WORK ====================== */
             while (ctx->is_sim_running && ctx->is_day_running) {
 
-                // Cambiato per questa funzione così non
-                // è bloccante e si può controllare l'uscita dei workers
-                const ssize_t res = recv_msg_nw(self->queue, -DEFAULT, &response);
-                if (res == -1) {
-                    usleep(10000);
-                    continue; // Controlla di nuovo se la sim è finita
+                const ssize_t res = recv_msg_np(self->queue, -DEFAULT, &response);
+                if (res == -1 && errno == EINTR) {
+                    continue;
                 }
 
                 switch (self->role) {
@@ -155,7 +159,7 @@ main(
 
         sem_wait(ctx->sem.day);
         if (!ctx->is_sim_running) {
-            zprintf(ctx->sem.out, "WORKER %d: Simulazione finita, esco.\n", getpid());
+            zprintf(ctx->sem.out, "WORKER %d: Giornata finita, esco.\n", getpid());
             break;
         }
     }

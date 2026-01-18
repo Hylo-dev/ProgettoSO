@@ -57,13 +57,13 @@ recive_msg(
 }
 
 static ssize_t
-recv_msg_nw(
+recv_msg_np(
     const size_t qid,
     const long   mtype,
     msg_t *out
 ) {
     constexpr ssize_t m_size = sizeof(msg_t) - sizeof(long);
-    return msgrcv((int)qid, out, m_size, mtype, IPC_NOWAIT);
+    return msgrcv((int)qid, out, m_size, mtype, 0);
 }
 
 

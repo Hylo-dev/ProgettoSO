@@ -152,8 +152,12 @@ sem_wait(const sem_t sem_id) {
     sb.sem_op  = -1;
     sb.sem_flg =  0;
 
-    if (semop(sem_id, &sb, 1) == -1) 
-        panic("ERROR: sem_wait failed, id %d\n", sem_id);
+    if (semop(sem_id, &sb, 1) == -1) {
+        if (errno != EINTR) {
+            panic("ERROR: sem_wait failed, id %d\n", sem_id);
+        }
+    }
+
 }
 
 // Operaxzione V: Incrementa (Signal)
@@ -164,9 +168,11 @@ sem_signal(const sem_t sem_id) {
     sb.sem_op  = 1;
     sb.sem_flg = 0;
 
-    if (semop(sem_id, &sb, 1) == -1)
-        panic("ERROR: sem_signal failed, id %d\n", sem_id);
-
+    if (semop(sem_id, &sb, 1) == -1) {
+        if (errno != EINTR) {
+            panic("ERROR: sem_signal failed, id %d\n", sem_id);
+        }
+    }
 }
 
 // Operazione: Setta un valore al semaforo

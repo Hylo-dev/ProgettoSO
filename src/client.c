@@ -8,7 +8,6 @@
 #include "tools.h"
 #include <stddef.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 // NOTE: The client will always pick a maximum of one
@@ -83,56 +82,25 @@ ask_dish(
 );
 
 
-int
-main(
-    const int    argc,
-          char** argv
+void
+send_request(
+    const simctx_t *ctx,
+    const sem_t     out_sem,
+    const sem_t     tbl_sem,
+          client_t  self,
+          msg_t    *response,
+          int      *price
 ) {
-    // argv must be:
-    /* {
-     *    exec name,
-     *    ticket,
-     *    ctx_shmid,
-     * } */
-    if (argc != 3)
-        panic("ERROR: Invalid client arguments for pid: %d", getpid());
-
-    const bool   ticket  = atob(argv[1]);
-    const size_t shmid   = atos(argv[2]);
-    
-    const simctx_t *ctx  = get_ctx(shmid);
-
-    const sem_t out_sem = ctx->sem.out;
-    const sem_t tbl_sem = ctx->sem.tbl;
-
-    struct client_menu menu = {0};
-    loc_t tmp_lc;
-
-    pick_dishes(&menu, ctx, &tmp_lc);
-
-    client_t self  = {
-        .pid       = getpid(),
-        .ticket    = ticket,
-        .loc       = tmp_lc,
-        .served    = false,
-        .msgq      = ctx->id_msg_q[FIRST_COURSE],
-        .wait_time = 0,
-        .dishes    = menu
-    };
-        
-    msg_t response;
-    int   price = 0; // Settato zero perche' senno' dopo con `+=` esplode :)
-
-    while (ctx->is_sim_running) {
+    while (ctx->is_sim_running && ctx->is_day_running) {
         if (self.loc < NOF_STATIONS)
             self.msgq = ctx->id_msg_q[self.loc];
 
-        msg_t msg = {
+        const msg_t msg = {
             /* l'mtype contiene:
-             * la priorita' della richiesta se e' il cliente a mandarlo;
-             * il pid del cliente se e' una riposta da parte del worker */
+                 * la priorita' della richiesta se e' il cliente a mandarlo;
+                 * il pid del cliente se e' una riposta da parte del worker */
             .mtype  = (self.loc == CHECKOUT && self.ticket)?
-                        TICKET : DEFAULT,
+                          TICKET : DEFAULT,
             .client = self.pid,
             .dish   = {
                 self.loc < 3 ? (size_t)self.dishes.data[self.loc] : 0,
@@ -154,19 +122,18 @@ main(
                     self,
                     msg,
                     out_sem,
-                    &response
+                    response
                 );
 
                 price += (int)dish.price;
                 self.dishes.data[self.loc] = (int)dish.id;
-                
+
                 break;
 
             case CHECKOUT:
 
                 send_msg(self.msgq, msg, sizeof(msg_t)-sizeof(long));
-
-                recive_msg(self.msgq, self.pid, &response);
+                recive_msg(self.msgq, self.pid, response);
 
                 break;
 
@@ -178,7 +145,7 @@ main(
                 );
 
                 sem_wait(tbl_sem);
-                
+
                 zprintf(
                     out_sem,
                     "CLIENT %d: Found table, Eating for %zu ns\n",
@@ -206,6 +173,61 @@ main(
 
         self.loc++;
     }
+}
+
+int
+main(
+    const int    argc,
+          char** argv
+) {
+    // argv must be:
+    /* {
+     *    exec name,
+     *    ticket,
+     *    ctx_shmid,
+     * } */
+    if (argc != 3)
+        panic("ERROR: Invalid client arguments for pid: %d", getpid());
+
+    const bool   ticket  = atob(argv[1]);
+    const size_t shmid   = atos(argv[2]);
+
+    while (true) {
+        const simctx_t *ctx  = get_ctx(shmid);
+        zprintf(
+            ctx->sem.out,
+            "CLIENT: Waiting new day\n"
+        );
+        sem_wait(ctx->sem.wall);
+
+        const sem_t out_sem = ctx->sem.out;
+        const sem_t tbl_sem = ctx->sem.tbl;
+
+        struct client_menu menu = {0};
+        loc_t tmp_lc;
+
+        pick_dishes(&menu, ctx, &tmp_lc);
+
+        client_t self  = {
+            .pid       = getpid(),
+            .ticket    = ticket,
+            .loc       = tmp_lc,
+            .served    = false,
+            .msgq      = ctx->id_msg_q[FIRST_COURSE],
+            .wait_time = 0,
+            .dishes    = menu
+        };
+
+        msg_t response;
+        int   price = 0; // Settato zero perche' senno' dopo con `+=` esplode :)
+        send_request(ctx, out_sem, tbl_sem, self, &response, &price);
+
+        if (!ctx->is_sim_running) {
+            zprintf(ctx->sem.out, "CLIENT %d: Giornata finita, esco.\n", getpid());
+            break;
+        }
+    }
+
 }
 
 

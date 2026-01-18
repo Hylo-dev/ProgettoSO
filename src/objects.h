@@ -67,7 +67,7 @@ typedef struct {
 typedef struct {
     size_t id;
     size_t quantity;
-} dish_available_t;
+} dish_avl_t;
 
 typedef enum {
     FIRST  = 0,
@@ -148,11 +148,11 @@ typedef struct {
 
 typedef struct {
     stats  global_stats;
-    conf_t config;
+    const conf_t config;
 
     struct semaphores {
         sem_t shm;
-        sem_t day;
+        sem_t wk_end;
         sem_t out;
         sem_t tbl;
         sem_t wall;
@@ -160,7 +160,7 @@ typedef struct {
 
     // Read && Write
     struct available_dishes {
-        dish_available_t elements[MAX_ELEMENTS];
+        dish_avl_t elements[MAX_ELEMENTS];
         size_t size;
     } available_dishes[3];
 

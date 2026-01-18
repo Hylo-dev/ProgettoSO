@@ -55,7 +55,7 @@ main(void) {
     // sem_t tbl;
     // sem_t wall;
     printf("shm: %d\n", ctx->sem.shm);
-    printf("day: %d\n", ctx->sem.day);
+    printf("day: %d\n", ctx->sem.wk_end);
     printf("out: %d\n", ctx->sem.out);
     printf("tbl: %d\n", ctx->sem.tbl);
     printf("wall: %d\n", ctx->sem.wall);
@@ -114,7 +114,7 @@ main(void) {
     semctl(ctx->sem.out, 0, IPC_RMID);
     semctl(ctx->sem.tbl, 0, IPC_RMID);
     semctl(ctx->sem.shm, 0, IPC_RMID);
-    semctl(ctx->sem.day, 0, IPC_RMID);
+    semctl(ctx->sem.wk_end, 0, IPC_RMID);
     it(i, 0, NOF_STATIONS)
         msgctl((int)ctx->id_msg_q[i], IPC_RMID, NULL);
 
@@ -132,7 +132,7 @@ void sim_day(
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
-    set_sem(ctx->sem.day,  ctx->config.nof_workers);
+    set_sem(ctx->sem.wk_end,  ctx->config.nof_workers);
     set_sem(ctx->sem.wall, ctx->config.nof_workers);
 
     size_t min = 0;
@@ -149,7 +149,7 @@ void sim_day(
         
         sem_wait(ctx->sem.shm);
         it (loc_idx, 0, 2) {
-                  dish_available_t *elem_avl = ctx->available_dishes[loc_idx].elements;
+                  dish_avl_t *elem_avl = ctx->available_dishes[loc_idx].elements;
             const size_t            size_avl = ctx->available_dishes[loc_idx].size;
             const size_t            max      = ctx->config.max_porzioni[loc_idx];
             const size_t            refill   = ctx->config.avg_refill[loc_idx];
@@ -176,7 +176,7 @@ void sim_day(
     }
 
     printf("MAIN: Reset day sem\n");
-    sem_wait_zero(ctx->sem.day);
+    sem_wait_zero(ctx->sem.wk_end);
 
     printf("MAIN: Stats da implementare\n");
 }
@@ -254,7 +254,7 @@ init_ctx(
 
     ctx->sem.out  = sem_init(1);
     ctx->sem.shm  = sem_init(1);
-    ctx->sem.day  = sem_init(0);
+    ctx->sem.wk_end  = sem_init(0);
     ctx->sem.wall = sem_init(0);
     ctx->sem.tbl  = sem_init(ctx->config.nof_wk_seats[TABLE]);
 

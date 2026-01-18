@@ -10,8 +10,8 @@
 
 static inline station*
 get_station(
-    shmid_t shmid,
-    loc_t   role
+    const shmid_t shmid,
+    const loc_t   role
 ) {
     return &(get_stations(shmid))[role];
 }
@@ -22,7 +22,7 @@ serve_client(
           simctx_t*,
           station*,
           msg_t*,
-    const double
+          double
 );
 
 void handle_signal(int sig) { }
@@ -55,6 +55,7 @@ main(
     sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {
+
         // Aspetta l'inizio della giornata
         simctx_t* ctx = get_ctx(ctx_id);
 
@@ -157,7 +158,7 @@ main(
             znsleep((size_t)ctx->config.stop_duration);
         }
 
-        sem_wait(ctx->sem.day);
+        sem_wait(ctx->sem.wk_end);
         if (!ctx->is_sim_running) {
             zprintf(ctx->sem.out, "WORKER %d: Giornata finita, esco.\n", getpid());
             break;

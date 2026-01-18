@@ -102,50 +102,6 @@ main(
     return 0;
 }
 
-
-void
-pick_dishes(
-           ssize_t  *menu,
-    const  simctx_t *ctx
-) {
-    ssize_t rnd;
-    ssize_t cur_loc;
-    size_t  cnt_nf;
-    
-    do {
-        cur_loc   = -1;
-        cnt_nf    = 0;
-
-        rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); // -1 ..< size
-        if (rnd != -1) {
-            cur_loc = FIRST_COURSE;
-            menu[FIRST] = (ssize_t)ctx->menu[FIRST].data[rnd].id;
-            
-        } else {
-            cnt_nf++;
-            menu[FIRST] = -1;
-        }
-
-        rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); // -1 ..< size
-        if (rnd != -1) {
-            if (cur_loc == -1) cur_loc = MAIN;
-            menu[MAIN] = (ssize_t)ctx->menu[MAIN].data[rnd].id;
-            
-        } else {
-            cnt_nf++;
-            menu[MAIN] = -1;
-        }
-    
-        rnd = (ssize_t)(rand() % (ctx->menu[COFFEE].size + 1) - 1);
-        if (rnd != -1) {
-            if (cur_loc == -1) cur_loc = COFFEE;
-            menu[COFFEE] = (ssize_t)ctx->menu[COFFEE].data[rnd].id;
-        } else {
-            cnt_nf++;
-            menu[COFFEE] = -1;            
-        }
-    } while(cnt_nf == 3);
-}
 void
 send_request(
     const simctx_t *ctx,
@@ -236,6 +192,49 @@ send_request(
     }
 }
 
+void
+pick_dishes(
+           ssize_t  *menu,
+    const  simctx_t *ctx
+) {
+    ssize_t rnd;
+    ssize_t cur_loc;
+    size_t  cnt_nf;
+    
+    do {
+        cur_loc   = -1;
+        cnt_nf    = 0;
+
+        rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); // -1 ..< size
+        if (rnd != -1) {
+            cur_loc = FIRST_COURSE;
+            menu[FIRST] = (ssize_t)ctx->menu[FIRST].data[rnd].id;
+            
+        } else {
+            cnt_nf++;
+            menu[FIRST] = -1;
+        }
+
+        rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); // -1 ..< size
+        if (rnd != -1) {
+            if (cur_loc == -1) cur_loc = MAIN;
+            menu[MAIN] = (ssize_t)ctx->menu[MAIN].data[rnd].id;
+            
+        } else {
+            cnt_nf++;
+            menu[MAIN] = -1;
+        }
+    
+        rnd = (ssize_t)(rand() % (ctx->menu[COFFEE].size + 1) - 1);
+        if (rnd != -1) {
+            if (cur_loc == -1) cur_loc = COFFEE;
+            menu[COFFEE] = (ssize_t)ctx->menu[COFFEE].data[rnd].id;
+        } else {
+            cnt_nf++;
+            menu[COFFEE] = -1;            
+        }
+    } while(cnt_nf == 3);
+}
 
 static dish_t
 ask_dish(

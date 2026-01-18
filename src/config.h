@@ -68,6 +68,9 @@ load_config(
     PARSE_INT(json, "NOF_USERS",            nof_users);
     assert(conf->nof_users > 0 && "NOF_USERS must be greater than 0");
 
+    PARSE_INT(json, "NOF_WORKERS",          nof_workers);
+    assert(conf->nof_workers >= 4 && "NOF_WORKERS must be >= 4");
+
     PARSE_INT(json, "MAX_USERS_PER_GROUP",  max_users_per_group);
     assert(conf->max_users_per_group >= 1 && "MAX_USERS_PER_GROUP must be >= 1");
 

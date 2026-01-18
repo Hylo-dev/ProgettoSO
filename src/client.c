@@ -161,6 +161,7 @@ send_request(
                     self.pid, self.loc
                 );
 
+                // IMPORTANT: TODO: add clients groups support here
                 sem_wait(ctx->sem.tbl);
 
                 zprintf(

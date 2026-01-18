@@ -35,8 +35,12 @@ send_msg(
     const size_t     msg_size
 ) {
 
-    if (msgsnd((int)qid, &msg, msg_size, 0) == -1)
-        panic("ERROR: Message failed to send - queueid: %d, pid: %d", qid, getpid());
+    if (msgsnd((int)qid, &msg, msg_size, 0) == -1) {
+        if (errno != EINTR) {
+            panic("ERROR: Message failed to send - queueid: %d, pid: %d", qid, getpid());
+        }
+    }
+
     return 0;
 }   
 
@@ -50,8 +54,11 @@ recive_msg(
 
     const ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
 
-    if (read < 0)
-        panic("ERROR: failed sending a message - queue_id: %zu, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
+    if (read < 0) {
+        if (errno != EINTR) {
+            panic("ERROR: failed sending a message - queue_id: %zu, pid: %d, mtype: %d, dishid: %d", qid, getpid(), mtype, out->dish.id);
+        }
+    }
 
     return 0;
 }

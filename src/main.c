@@ -20,7 +20,11 @@
 
 
 // lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
-static int g_priority_list[4];
+static int    g_priority_list[4];
+static struct {
+    pid_t* id;
+    size_t cnt;
+} g_client_pids;
 
 /* Prototipi */
 void init_client (shmid_t);
@@ -45,6 +49,7 @@ station*  init_stations(simctx_t*, size_t);
 int
 main(void) {
     /* ========================== INIT ========================== */
+    signal(SIGUSR1, SIG_IGN);
     srand((unsigned int)time(NULL));
 
     const size_t    ctx_shm = zshmget(sizeof(simctx_t));
@@ -58,6 +63,9 @@ main(void) {
     printf("wk_end: %d\n", ctx->sem.wk_end);
     printf("cl_end: %d\n", ctx->sem.cl_end);
     printf("\n");
+
+    g_client_pids.id  = zcalloc(ctx->config.nof_users, sizeof(pid_t));
+    g_client_pids.cnt = 0;
 
     const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
           station* st     = init_stations(ctx, st_shm);
@@ -141,6 +149,29 @@ void sim_day(
         sem_signal(ctx->sem.shm);
     }
     printf("MAIN: Fine giornata\n");
+
+    const int size_sem_cl = get_sem_val(ctx->sem.cl_end);
+    if (size_sem_cl >= ctx->config.overload_threshold) {
+        zprintf(
+            ctx->sem.out,
+            "MAIN: Sim end overload\n"
+        );
+        ctx->is_sim_running = false;
+
+        it(i, 0, NOF_STATIONS) {
+            const worker_t *wks = get_workers(stations[i].wk_data.shmid);
+            it(j, 0, stations[i].wk_data.cap) {
+                kill(wks[j].pid, SIGUSR1);
+            }
+        }
+
+        it(i, 0, ctx->config.nof_users) {
+            kill(g_client_pids.id[i], SIGUSR1);
+        }
+
+        return;
+    }
+
     ctx->is_day_running = false;
 
     it(i, 0, NOF_STATIONS) {
@@ -150,6 +181,10 @@ void sim_day(
                 kill(wks[j].pid, SIGUSR1);
             }
         }
+    }
+
+    it(i, 0, ctx->config.nof_users) {
+        kill(g_client_pids.id[i], SIGUSR1);
     }
 
     printf("MAIN: Reset day sem\n");
@@ -188,7 +223,9 @@ init_worker (
 void init_client(const shmid_t ctx_id) {
     const pid_t pid = zfork();
 
+    g_client_pids.id[g_client_pids.cnt++] = pid;
     if (pid == 0) {
+
         char *args[] = {
             "client",
             rand()%2 ? "1":"0",

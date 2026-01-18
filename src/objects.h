@@ -3,8 +3,6 @@
 
 #include "const.h"
 #include <stddef.h>
-#include <stdbool.h>
-#include <sys/_types/_ssize_t.h>
 #include <sys/types.h>
 
 #define DISH_NAME_MAX_LEN 32

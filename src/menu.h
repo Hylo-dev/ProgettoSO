@@ -82,9 +82,9 @@ load_menu(
         panic("ERROR: Failed to parse JSON");
     }
 
-    load_category(json, MAIN, ctx->menu[MAIN].elements, &ctx->menu[MAIN].size, MAX_ELEMENTS);
-    load_category(json, FIRST, ctx->menu[FIRST].elements, &ctx->menu[FIRST].size, MAX_ELEMENTS);
-    load_category(json, COFFEE, ctx->menu[COFFEE].elements, &ctx->menu[COFFEE].size, MAX_ELEMENTS);
+    load_category(json, MAIN, ctx->menu[MAIN].data, &ctx->menu[MAIN].size, MAX_ELEMENTS);
+    load_category(json, FIRST, ctx->menu[FIRST].data, &ctx->menu[FIRST].size, MAX_ELEMENTS);
+    load_category(json, COFFEE, ctx->menu[COFFEE].data, &ctx->menu[COFFEE].size, MAX_ELEMENTS);
 
     cJSON_Delete(json);
     free(raw_json);

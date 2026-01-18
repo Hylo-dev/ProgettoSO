@@ -98,8 +98,8 @@ load_config(
     PARSE_INT(json, "NOF_WK_SEATS_CASSA",   nof_wk_seats[CHECKOUT]);
     assert(conf->nof_wk_seats[CHECKOUT] > 0 && "NOF_WK_SEATS_CASSA must be > 0");
 
-    PARSE_INT(json, "NOF_TABLE_SEATS",      nof_wk_seats[TABLE]);
-    assert(conf->nof_wk_seats[TABLE] > 0 && "NOF_TABLE_SEATS must be > 0");
+    PARSE_INT(json, "NOF_TABLE_SEATS",      nof_tbl_seats);
+    assert(conf->nof_tbl_seats > 0 && "NOF_TABLE_SEATS must be > 0");
 
     PARSE_INT(json, "AVG_REFILL_PRIMI",     avg_refill[FIRST_COURSE]);
     assert(conf->avg_refill[FIRST_COURSE] > 0 && "AVG_REFILL_PRIMI must be > 0");

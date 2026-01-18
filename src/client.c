@@ -8,7 +8,6 @@
 #include "tools.h"
 #include <stddef.h>
 #include <stdlib.h>
-#include <sys/_types/_ssize_t.h>
 #include <unistd.h>
 
 // NOTE: The client will always pick a maximum of one

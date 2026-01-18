@@ -142,7 +142,7 @@ send_request(
                     response
                 );
 
-                price += (int)dish.price;
+                *price += (int)dish.price;
                 self.dishes[self.loc] = (int)dish.id;
 
                 break;

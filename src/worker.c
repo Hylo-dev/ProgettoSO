@@ -27,22 +27,22 @@ serve_client(
 
 void
 work_shift(
-    simctx_t *,
-    station  *,
+    simctx_t*,
+    station*,
     size_t,
-    msg_t    *,
-    size_t   *,
-    const worker_t *
+    msg_t*,
+    size_t*,
+    const worker_t*
 );
 
 void
 work_with_pause(
-    simctx_t *,
-    station  *,
+    simctx_t*,
+    station*,
     size_t,
-    msg_t    *,
-    size_t   *,
-    worker_t *
+    msg_t*,
+    size_t*,
+    worker_t*
 );
 
 int
@@ -117,12 +117,12 @@ main(
 
 void
 work_with_pause(
-    simctx_t *ctx,
-    station *st,
-    const size_t variance,
-    msg_t *response,
-    size_t *services,
-    worker_t *self
+          simctx_t *ctx,
+          station  *st,
+    const size_t    variance,
+          msg_t    *response,
+          size_t   *services,
+          worker_t *self
 ) {
     while (ctx->is_sim_running && ctx->is_day_running) {
 
@@ -149,7 +149,6 @@ work_with_pause(
         // 3. RILASCIO IL POSTO (Fine Turno)
         // ------------------------------------------------
         sem_signal(st->wk_data.sem);
-        // if (!ctx->is_sim_running || !ctx->is_day_running) break;
 
         self->pause_time += (size_t)ctx->config.stop_duration;
         znsleep((size_t)ctx->config.stop_duration);
@@ -195,8 +194,11 @@ work_shift(
         // CHECK_PAUSA: if the served clients are at least nof_pause
         // leaves the shift
         if (*services >= (size_t)ctx->config.nof_pause) {
-            zprintf(ctx->sem.out, "Worker %d va in pausa dopo %d servizi\n",
-                    getpid(), *services);
+            zprintf(
+                ctx->sem.out,
+                "Worker %d va in pausa dopo %d servizi\n",
+                    getpid(), *services
+            );
             break;
         }
     }
@@ -211,7 +213,6 @@ _serve_food(
           size_t    time
 ) {
     const size_t dish_id = response->dish.id;
-    // const sem_t  out_sem = ctx->sem.out;
     
     ssize_t actual_index = -1;
     struct available_dishes* dishes = &ctx->avl_dishes[self->role];
@@ -252,8 +253,8 @@ _serve_food(
 
 static inline void
 _serve_checkout(
-    const worker_t   *self, // ronly
-          station    *st,   // ronly
+    const worker_t   *self,
+          station    *st,  
           msg_t *response
 ) {
     if (self->role == CHECKOUT)

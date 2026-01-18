@@ -39,14 +39,15 @@ main(
         stations_shmid
         role,
     } */
-    if (argc != 4)
+    if (argc != 5)
         panic("ERROR: Invalid worker arguments for pid: %d", getpid());
 
     /* ====================== INIT ======================= */
     
-    const shmid_t   ctx_id  =        atos(argv[1]);
-    const shmid_t   sts_id  =        atos(argv[2]);
-    const loc_t     role    = (loc_t)atos(argv[3]);
+    const shmid_t ctx_id  = atos(argv[1]);
+    const shmid_t sts_id  = atos(argv[2]);
+    const size_t  idx     = atos(argv[3]);
+    const loc_t   role    = atos(argv[4]);
 
     struct sigaction sa;
     sa.sa_handler = handle_signal;
@@ -69,8 +70,6 @@ main(
 
         station  *st  = get_station(sts_id, role);
         worker_t *wks = get_workers(st->wk_data.shmid);
-        // const sem_t     shm_sem = ctx->sem.shm;
-        // const sem_t     out_sem = ctx->sem.out;
 
         const size_t    queue    = ctx->id_msg_q[role];
         const size_t    variance = var_srvc[role];
@@ -79,7 +78,6 @@ main(
 
         // attatch self to the mem area in the shm
         sem_wait(st->sem);
-        const size_t idx = st->wk_data.cnt++;
         wks[idx] = (worker_t) {
             .pid        = getpid(),
             .role       = role,
@@ -103,7 +101,7 @@ main(
             clock_gettime(CLOCK_REALTIME, &t_start);
             sem_wait(st->wk_data.sem);
             clock_gettime(CLOCK_REALTIME, &t_end);
-            const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * 1000000000L +
+            const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * TO_NANOSEC +
                            (t_end.tv_nsec - t_start.tv_nsec);
             self->pause_time += (size_t)wait_ns;
 
@@ -113,9 +111,8 @@ main(
             while (ctx->is_sim_running && ctx->is_day_running) {
 
                 const ssize_t res = recv_msg_np(self->queue, -DEFAULT, &response);
-                if (res == -1 && errno == EINTR) {
+                if (res == -1 && errno == EINTR)
                     continue;
-                }
 
                 switch (self->role) {
                     case COFFEE_BAR:
@@ -180,18 +177,18 @@ _serve_food(
     const sem_t  out_sem = ctx->sem.out;
     
     ssize_t actual_index = -1;
-    struct available_dishes* dishes = &ctx->available_dishes[self->role];
+    struct available_dishes* dishes = &ctx->avl_dishes[self->role];
     
     for (size_t i = 0; i < dishes->size; i++) {
-        if (dishes->elements[i].id == dish_id) {
+        if (dishes->data[i].id == dish_id) {
             actual_index = (ssize_t)i;
             break;
         }
     }
 
     if (actual_index != -1) {
-        size_t *quantity_p = (size_t*)&dishes->elements[actual_index].quantity;
-        const dish_t dish_info = ctx->menu[self->role].elements[actual_index];
+        size_t *quantity_p = (size_t*)&dishes->data[actual_index].quantity;
+        const dish_t dish_info = ctx->menu[self->role].data[actual_index];
 
         if (*quantity_p > 0) {
             // the BAR has infinite coffees, what a dream.

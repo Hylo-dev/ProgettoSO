@@ -4,6 +4,7 @@
 #include "const.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include <sys/_types/_ssize_t.h>
 #include <sys/types.h>
 
 #define DISH_NAME_MAX_LEN 32
@@ -42,10 +43,6 @@ typedef struct {
     size_t pause_time;  // cumulative time spent on pause
 } worker_t;
 
-struct client_menu {
-    size_t  cnt;
-    ssize_t data[MAX_DISHES];
-};
 
 typedef struct {
     pid_t  pid;
@@ -54,7 +51,7 @@ typedef struct {
     bool   served;
     size_t msgq;
     size_t wait_time;
-    struct client_menu dishes;
+    ssize_t dishes[MAX_DISHES];
 } client_t;
 
 typedef struct {
@@ -96,14 +93,13 @@ typedef struct {
 
     struct {    
         shmid_t shmid;
-        size_t  cnt;
         size_t  cap;
         // a run time inizializzato a config.nof_wk_seats[type]
         // per gestire il massimo di lavoratori attivi (le pause)
         sem_t   sem;
     } wk_data;
     
-    dish_t    menu[DISHES_COUNT];
+    dish_t menu[DISHES_COUNT];
 } station;
 
 typedef struct {
@@ -119,19 +115,20 @@ typedef struct {
     int nof_pause;
 
     // Tempi di servizio (AVG)
-    int avg_srvc[4];
+    int avg_srvc[NOF_STATIONS];
     // primi;
     // main_course;
     // coffee;
     // cassa;
 
     // Capacità (Posti)
-    int nof_wk_seats[5];
+    int nof_wk_seats[NOF_STATIONS];
     // primi;
     // main;
     // coffee;
     // cassa;
-    // seats;
+
+    int nof_tbl_seats;
 
     // Logistica Cibo & Versione Completa
     int avg_refill[2];
@@ -148,7 +145,7 @@ typedef struct {
 
 typedef struct {
     stats  global_stats;
-    const conf_t config;
+    conf_t config;
 
     struct semaphores {
         sem_t shm;
@@ -160,13 +157,13 @@ typedef struct {
 
     // Read && Write
     struct available_dishes {
-        dish_avl_t elements[MAX_ELEMENTS];
-        size_t size;
-    } available_dishes[3];
+        dish_avl_t data[MAX_ELEMENTS];
+        size_t     size;
+    } avl_dishes[3];
 
     // ONLY READ
     struct {
-        dish_t elements[MAX_ELEMENTS];
+        dish_t data[MAX_ELEMENTS];
         size_t size;
     } menu[3];
 

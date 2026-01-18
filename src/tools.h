@@ -264,7 +264,7 @@ atob(const char* str) {
 
 static inline char*
 itos(const int val) {
-    static char buffers[4][12]; 
+    static char buffers[8][12]; 
     static int idx = 0;
 
     char* current = buffers[idx];

@@ -50,7 +50,7 @@ recive_msg(
     const long   mtype,
     msg_t *out
 ) {
-    const size_t msg_size = sizeof(msg_t)-sizeof(long);
+    constexpr size_t msg_size = sizeof(msg_t)-sizeof(long);
 
     const ssize_t read = msgrcv((int)qid, out, msg_size, mtype, 0);
 

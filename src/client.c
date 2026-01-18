@@ -65,14 +65,14 @@ main(
     sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {
-
         const simctx_t *ctx = get_ctx(shmid);
-
         zprintf(
             ctx->sem.out,
             "CLIENT: Waiting new day\n"
         );
         sem_wait(ctx->sem.wall);
+
+        if (!ctx->is_sim_running) break;
 
         client_t self  = {
             .pid       = getpid(),
@@ -229,7 +229,7 @@ send_request(
                     "CLIENT: %d, EXIT\n",
                     self.pid
                 );
-                exit(1);
+                return;
         }
 
         self.loc++;

@@ -104,8 +104,7 @@ main(void) {
     ctx->is_sim_running = false;
     printf("MAIN: Fine sim\n");
 
-    // Libera i wk così muoiono
-    set_sem(ctx->sem.wall, ctx->config.nof_workers);
+    set_sem(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
     shmctl((int)shm_id, IPC_RMID, NULL);
@@ -133,7 +132,7 @@ void sim_day(
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
-    set_sem(ctx->sem.wall,   ctx->config.nof_workers);
+    set_sem(ctx->sem.wall,   ctx->config.nof_workers + ctx->config.nof_users);
     set_sem(ctx->sem.wk_end, ctx->config.nof_workers);
     set_sem(ctx->sem.cl_end, ctx->config.nof_users  );
 

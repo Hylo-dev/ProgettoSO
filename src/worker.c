@@ -74,9 +74,7 @@ main(
     sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {
-
         simctx_t* ctx = get_ctx(ctx_id);
-
         zprintf(
             ctx->sem.out,
             "WORKER: WAITING INIT DAY\n"

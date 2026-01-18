@@ -15,8 +15,8 @@
 //       dish for the FIRST and one for the MAIN
 void
 pick_dishes(
-           ssize_t*,
-    const  simctx_t*
+          ssize_t*,
+    const simctx_t*
 );
 
 
@@ -92,12 +92,14 @@ main(
         /* =============== BEGIN OF REQUEST LOOP ============== */
         send_request(ctx, self, &response, &price);
 
+        sem_wait(ctx->sem.cl_end);
         if (!ctx->is_sim_running) {
             zprintf(ctx->sem.out, "CLIENT %d: Giornata finita, esco.\n", getpid());
             break;
         }
     }
 
+    return 0;
 }
 
 

@@ -18,38 +18,39 @@
 #include "tools.h"
 #include "menu.h"
 
-#define SHM_RW 0666
 
 // lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
 static int g_priority_list[4];
 
 /* Prototipi */
-void init_client  (shmid_t);
-void init_worker  (const shmid_t, const shmid_t, const size_t, const loc_t);
-void sim_day      (simctx_t *, station *, size_t);
-void assign_roles (const simctx_t*, station*);
+void init_client (shmid_t);
+void init_worker (
+    const shmid_t,
+    const shmid_t,
+    const size_t,
+    const loc_t
+);
+void sim_day (
+    simctx_t*,
+    station*,
+    size_t
+);
+void assign_roles(
+    const simctx_t*,
+          station*
+);
 simctx_t* init_ctx(size_t);
-
-int _compare_pair_station(const void* a, const void* b) {
-    const struct pair_station* first  = a;
-    const struct pair_station* second = b;
-    return (second->avg_time - first->avg_time);
-}
+station*  init_stations(simctx_t*, size_t);
 
 int
 main(void) {
     /* ========================== INIT ========================== */
     srand((unsigned int)time(NULL));
 
-    const size_t
-    shm_id = zshmget(
-        IPC_PRIVATE,
-        sizeof(simctx_t),
-        IPC_CREAT | SHM_RW
-    );
+    const size_t    ctx_shm = zshmget(sizeof(simctx_t));
+          simctx_t* ctx     = init_ctx(ctx_shm);
 
-    simctx_t* ctx = init_ctx(shm_id);
-
+    // TODO: to remove in production
     printf("shm:    %d\n", ctx->sem.shm   );
     printf("out:    %d\n", ctx->sem.out   );
     printf("tbl:    %d\n", ctx->sem.tbl   );
@@ -58,36 +59,11 @@ main(void) {
     printf("cl_end: %d\n", ctx->sem.cl_end);
     printf("\n");
 
-    const size_t
-    shm_stations_id = zshmget(
-                          IPC_PRIVATE,
-                          sizeof(station) * NOF_STATIONS,
-                          IPC_CREAT | SHM_RW
-                      );
-
-    station *st = get_stations(shm_stations_id);
-    memset(st, 0, sizeof(station) * NOF_STATIONS);
-    // In src/main.c dentro il main()
-
-    it (i, 0, NOF_STATIONS) {
-        st[i].type        = (loc_t)i;
-        st[i].sem         = sem_init(1);
-        st[i].wk_data.sem = sem_init(ctx->config.nof_wk_seats[i]);
-
-        st[i].wk_data.shmid = zshmget(
-            IPC_PRIVATE,
-            sizeof(worker_t) * ctx->config.nof_workers,
-            IPC_CREAT | SHM_RW
-        );
-
-        if (i < CHECKOUT) {
-            it (j, 0, ctx->menu[i].size)
-                st[i].menu[j] = ctx->menu[i].data[j];
-        }
-    }
+    const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
+          station* st     = init_stations(ctx, st_shm);
 
     it (i, 0, ctx->config.nof_users)
-        init_client(shm_id);
+        init_client(ctx_shm);
 
     assign_roles(ctx, st);
     it (type, 0, NOF_STATIONS) {
@@ -95,7 +71,7 @@ main(void) {
 
         // the `k` index will be the index where the worker will put its data
         it (k, 0, cap)
-            init_worker(shm_id, shm_stations_id, k, (loc_t)type);
+            init_worker(ctx_shm, st_shm, k, (loc_t)type);
     }
     
     it(i, 0, ctx->config.sim_duration)
@@ -107,7 +83,7 @@ main(void) {
     set_sem(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
-    shmctl((int)shm_id, IPC_RMID, NULL);
+    shmctl((int)ctx_shm, IPC_RMID, NULL);
     semctl(ctx->sem.shm   , 0, IPC_RMID);
     semctl(ctx->sem.out   , 0, IPC_RMID);
     semctl(ctx->sem.tbl   , 0, IPC_RMID);
@@ -283,6 +259,32 @@ init_ctx(
     }
 
     return ctx;
+}
+
+station*
+init_stations(
+    simctx_t* ctx,
+    size_t shmid
+) {
+    station *st = get_stations(shmid);
+    memset(st, 0, sizeof(station) * NOF_STATIONS);
+
+    it (i, 0, NOF_STATIONS) {
+        st[i].type        = (loc_t)i;
+        st[i].sem         = sem_init(1);
+        st[i].wk_data.sem = sem_init(ctx->config.nof_wk_seats[i]);
+
+        st[i].wk_data.shmid = zshmget(
+            sizeof(worker_t) * ctx->config.nof_workers
+        );
+
+        if (i < CHECKOUT) {
+            it (j, 0, ctx->menu[i].size)
+                st[i].menu[j] = ctx->menu[i].data[j];
+        }
+    }
+
+    return st;
 }
 
 void

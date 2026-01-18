@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <sys/ipc.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/msg.h>
@@ -15,6 +16,8 @@
 
 #include "const.h"
 #include "objects.h"
+
+#define SHM_RW 0666
 
 // any type
 typedef       void* any; 
@@ -79,8 +82,8 @@ zfork() {
 
 /* ====================== SHM WRAPPER ====================== */
 static inline size_t
-zshmget(key_t key, size_t size, int mode){
-    int res = shmget(key, size, mode);
+zshmget(size_t size){
+    int res = shmget(IPC_PRIVATE, size, IPC_CREAT | SHM_RW);
     if (res < 0)
         panic("ERROR: Shared memory allocation is failed\n");
     return (size_t)res;
@@ -269,12 +272,12 @@ itos(const int val) {
 
     char* current = buffers[idx];
     
-    idx = (idx + 1) % 4;
+    idx = (idx + 1) % (sizeof(buffers) / sizeof(buffers[0]));
 
-    sprintf(current, "%d", val);
+    snprintf(current, sizeof(buffers[0]), "%d", val);
+    
     return current;
 }
-
 
 static inline size_t
 get_service_time(

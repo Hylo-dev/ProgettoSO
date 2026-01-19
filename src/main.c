@@ -22,6 +22,11 @@
 
 // lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
 static int g_priority_list[4];
+static struct {
+    pid_t* id;
+    size_t cnt;
+} g_client_pids;
+
 
 /* Prototipi */
 void init_client (shmid_t);
@@ -58,6 +63,7 @@ render_dashboard(
 int
 main(void) {
     /* ========================== INIT ========================== */
+    signal(SIGUSR1, SIG_IGN);
     srand((unsigned int)time(NULL));
     screen* s = init_scr();
 
@@ -73,6 +79,9 @@ main(void) {
     // zprintf(ctx->sem.out, "cl_end: %d\n", ctx->sem.cl_end);
     // zprintf(ctx->sem.out, "\n");
 
+    g_client_pids.id  = zcalloc(ctx->config.nof_users, sizeof(pid_t));
+    g_client_pids.cnt = 0;
+    
     const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
           station* st     = init_stations(ctx, st_shm);
 
@@ -159,6 +168,28 @@ void sim_day(
         sem_signal(ctx->sem.shm);
     }
     zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
+    const int size_sem_cl = get_sem_val(ctx->sem.cl_end);
+    if (size_sem_cl >= ctx->config.overload_threshold) {
+        zprintf(
+            ctx->sem.out,
+            "MAIN: Sim end overload\n"
+        );
+        ctx->is_sim_running = false;
+
+        it(i, 0, NOF_STATIONS) {
+            const worker_t *wks = get_workers(stations[i].wk_data.shmid);
+            it(j, 0, stations[i].wk_data.cap) {
+                kill(wks[j].pid, SIGUSR1);
+            }
+        }
+
+        it(i, 0, ctx->config.nof_users) {
+            kill(g_client_pids.id[i], SIGUSR1);
+        }
+
+        return;
+    }
+
     ctx->is_day_running = false;
 
     it(i, 0, NOF_STATIONS) {
@@ -169,7 +200,11 @@ void sim_day(
             }
         }
     }
-
+    
+    it(i, 0, ctx->config.nof_users) {
+        kill(g_client_pids.id[i], SIGUSR1);
+    }
+    
     zprintf(ctx->sem.out, "MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.wk_end);
     sem_wait_zero(ctx->sem.cl_end);
@@ -216,6 +251,7 @@ void init_client(const shmid_t ctx_id) {
         execve("./bin/client", args, NULL);
         panic("ERROR: Execve failed for client\n");
     }
+    g_client_pids.id[g_client_pids.cnt++] = pid;
 }
 
 /* =========================== OUTPUT =========================== */ 

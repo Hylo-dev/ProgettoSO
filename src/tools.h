@@ -204,6 +204,15 @@ sem_wait_zero(const sem_t id) {
         panic("ERROR: sem_wait_zero failed\n");
 }
 
+static inline int
+get_sem_val(const sem_t id) {
+    const int val = semctl(id, 0, GETVAL);
+    if (val == -1)
+        panic("ERROR: semctl GETVAL failed\n");
+
+    return val;
+}
+
 static void
 zprintf(
     const sem_t sem_id,

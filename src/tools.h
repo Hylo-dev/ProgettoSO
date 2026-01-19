@@ -19,6 +19,8 @@
 
 #define SHM_RW 0666
 
+#define DEBUG 0
+
 // any type
 typedef       void* any; 
 
@@ -207,6 +209,8 @@ zprintf(
     const sem_t sem_id,
     const char *fmt, ...
 ) {
+    if (!DEBUG) return;
+    
     va_list args;
 
     sem_wait(sem_id);
@@ -226,8 +230,8 @@ znsleep(const size_t wait_time) {
 
     const size_t total_ns = wait_time * N_NANO_SECS;
 
-    req.tv_sec = (time_t)(total_ns / 1000000000L);
-    req.tv_nsec = (long)(total_ns % 1000000000L);
+    req.tv_sec  = (time_t)(total_ns / TO_NANOSEC);
+    req.tv_nsec = (long)  (total_ns % TO_NANOSEC);
 
     nanosleep(&req, NULL);
 }

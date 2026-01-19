@@ -17,6 +17,7 @@
 #include "objects.h"
 #include "tools.h"
 #include "menu.h"
+#include "tui.h"
 
 
 // lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
@@ -33,7 +34,8 @@ void init_worker (
 void sim_day (
     simctx_t*,
     station*,
-    size_t
+    size_t,
+    screen*
 );
 void assign_roles(
     const simctx_t*,
@@ -42,22 +44,34 @@ void assign_roles(
 simctx_t* init_ctx(size_t);
 station*  init_stations(simctx_t*, size_t);
 
+screen* init_scr();
+void    kill_scr(screen* s);
+
+void
+render_dashboard(
+    screen   *s,
+    simctx_t *ctx,
+    station  *stations,
+    size_t
+);
+
 int
 main(void) {
     /* ========================== INIT ========================== */
     srand((unsigned int)time(NULL));
+    screen* s = init_scr();
 
     const size_t    ctx_shm = zshmget(sizeof(simctx_t));
           simctx_t* ctx     = init_ctx(ctx_shm);
 
-    // TODO: to remove in production
-    printf("shm:    %d\n", ctx->sem.shm   );
-    printf("out:    %d\n", ctx->sem.out   );
-    printf("tbl:    %d\n", ctx->sem.tbl   );
-    printf("wall:   %d\n", ctx->sem.wall  );
-    printf("wk_end: %d\n", ctx->sem.wk_end);
-    printf("cl_end: %d\n", ctx->sem.cl_end);
-    printf("\n");
+    // // TODO: to remove in production
+    // zprintf(ctx->sem.out, "shm:    %d\n", ctx->sem.shm   );
+    // zprintf(ctx->sem.out, "out:    %d\n", ctx->sem.out   );
+    // zprintf(ctx->sem.out, "tbl:    %d\n", ctx->sem.tbl   );
+    // zprintf(ctx->sem.out, "wall:   %d\n", ctx->sem.wall  );
+    // zprintf(ctx->sem.out, "wk_end: %d\n", ctx->sem.wk_end);
+    // zprintf(ctx->sem.out, "cl_end: %d\n", ctx->sem.cl_end);
+    // zprintf(ctx->sem.out, "\n");
 
     const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
           station* st     = init_stations(ctx, st_shm);
@@ -75,10 +89,10 @@ main(void) {
     }
     
     it(i, 0, ctx->config.sim_duration)
-        sim_day(ctx, st, i);
+        sim_day(ctx, st, i, s);
 
     ctx->is_sim_running = false;
-    printf("MAIN: Fine sim\n");
+    zprintf(ctx->sem.out, "MAIN: Fine sim\n");
 
     set_sem(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
@@ -94,17 +108,19 @@ main(void) {
     it(i, 0, NOF_STATIONS)
         msgctl((int)ctx->id_msg_q[i], IPC_RMID, NULL);
 
+    kill_scr(s);
     return 0;
 }
 
 void sim_day(
           simctx_t *ctx,
           station  *stations,
-    const size_t    day
+    const size_t    day,
+          screen   *s
 ) {
     if (day > 0) assign_roles(ctx, stations);
 
-    printf("MAIN: Inizio giornata\n");
+    zprintf(ctx->sem.out, "MAIN: Inizio giornata\n");
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
@@ -115,10 +131,12 @@ void sim_day(
     size_t min = 0;
     const size_t avg_refill_time = ctx->config.avg_refill_time;
     while (ctx->is_sim_running && min < WORK_DAY_MINUTES) {
+        render_dashboard(s, ctx, stations, day+1);
+        
         const size_t refill_time = get_service_time(
-                                       avg_refill_time,
-                                       var_srvc[4]
-                                   );
+            avg_refill_time,
+            var_srvc[4]
+        );
 
         znsleep(refill_time);
 
@@ -140,7 +158,7 @@ void sim_day(
         }
         sem_signal(ctx->sem.shm);
     }
-    printf("MAIN: Fine giornata\n");
+    zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
     ctx->is_day_running = false;
 
     it(i, 0, NOF_STATIONS) {
@@ -152,11 +170,11 @@ void sim_day(
         }
     }
 
-    printf("MAIN: Reset day sem\n");
+    zprintf(ctx->sem.out, "MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.wk_end);
     sem_wait_zero(ctx->sem.cl_end);
 
-    printf("MAIN: Stats da implementare\n");
+    zprintf(ctx->sem.out, "MAIN: Stats da implementare\n");
 }
 
 /* ========================== PROCESSES ========================== */ 
@@ -199,6 +217,80 @@ void init_client(const shmid_t ctx_id) {
         panic("ERROR: Execve failed for client\n");
     }
 }
+
+/* =========================== OUTPUT =========================== */ 
+
+screen*
+init_scr() {
+    size_t rows, cols;
+    get_terminal_size(&rows, &cols);
+    screen *s = init_screen(rows, cols);
+    enableRawMode();
+    return s;
+}
+
+void
+kill_scr(screen* s) {
+    disableRawMode();
+    free_screen(s);
+}
+
+void
+render_dashboard(
+    screen   *s,
+    simctx_t *ctx,
+    station  *stations,
+    size_t    day
+) {
+    s_clear(s);
+    
+    /* ========================= TITLE ========================= */
+    s_draw_text_h(s, 2, 1,
+                  "--- MENSA SIMULATION DASHBOARD ---");
+    s_draw_text_h(s, 2, 2,
+                  "Day: %d | Status: %s",
+                  day, ctx->is_day_running ? "RUNNING" : "STOPPED");
+
+    // 2. Visualizzazione Tavoli (Semaforo)
+    int free_seats = semctl(ctx->sem.tbl, 0, GETVAL);
+    int occupied   = ctx->config.nof_tbl_seats - free_seats;
+
+    s_draw_text_h(s, 2, 4,
+                  "TABLES: [%d/%d]",
+                  occupied, ctx->config.nof_tbl_seats);
+    
+    // Barra orizzontale semplice per i tavoli
+    s_repeat_h(s, 15, 4, '#', occupied);
+
+    // 3. Barre Verticali per Piatti Disponibili (Esempio Primi e Secondi)
+    for (int loc = 0; loc < 2; loc++) {
+        int start_x = 5 + (loc * 20);
+        s_draw_text_h(s, start_x, 6, loc == 0 ? "PRIMI" : "SECONDI");
+        
+        for (size_t i = 0; i < ctx->avl_dishes[loc].size; i++) {
+            size_t qty = ctx->avl_dishes[loc].data[i].quantity;
+            size_t max = ctx->config.max_porzioni[loc];
+            int bar_height = (qty * 10) / (max > 0 ? max : 1); // Scala a 10 caratteri
+            
+            s_repeat_v(s, start_x, 17, '|', bar_height);
+            
+            s_draw_text_h(s,
+                start_x + (i * 2), 18,
+                "%zu", ctx->avl_dishes[loc].data[i].id
+            );
+        }
+    }
+
+    // 4. Stazioni e Worker
+    s_draw_text_h(s, 45, 6, "STATIONS STATUS");
+    for (int i = 0; i < NOF_STATIONS; i++) {
+        int active_wks = stations[i].wk_data.cap - semctl(stations[i].wk_data.sem, 0, GETVAL);
+        s_draw_text_h(s, 45, 7 + i, "ST %d: %d/%zu Workers Active", i, active_wks, stations[i].wk_data.cap);
+    }
+
+    s_display(s);
+}
+
 
 /* ========================== SUPPORT ========================== */ 
 

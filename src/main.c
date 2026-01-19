@@ -103,6 +103,20 @@ main(void) {
     ctx->is_sim_running = false;
     zprintf(ctx->sem.out, "MAIN: Fine sim\n");
 
+    ctx->is_sim_running = false;
+    ctx->is_day_running = false;
+    
+    while (true) {
+        s_clear(s);
+        s_draw_text(s, 2, 2, "--- SIMULAZIONE COMPLETATA ---");
+        s_draw_text(s, 2, 4, "Statistiche finali pronte.");
+        s_draw_text(s, 2, 6, "Premi [q] per distruggere IPC e uscire.");
+        s_display(s);
+
+        if (s_getch() == 'q') break;
+        usleep(100000);
+    }
+
     set_sem(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
@@ -140,7 +154,15 @@ void sim_day(
     size_t min = 0;
     const size_t avg_refill_time = ctx->config.avg_refill_time;
     while (ctx->is_sim_running && min < WORK_DAY_MINUTES) {
-        render_dashboard(s, ctx, stations, day+1);
+        for (int i = 0; i < 5; i++) {
+            render_dashboard(s, ctx, stations, day + 1);
+    
+            if (s_getch() == 'q') {
+                ctx->is_sim_running = false;
+                return;
+            }
+            usleep(50000); 
+        }
         
         const size_t refill_time = get_service_time(
             avg_refill_time,
@@ -238,7 +260,10 @@ init_worker (
     }
 }
 
-void init_client(const shmid_t ctx_id) {
+void
+init_client(
+    const shmid_t ctx_id
+) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
@@ -275,55 +300,98 @@ void
 render_dashboard(
     screen   *s,
     simctx_t *ctx,
-    station  *stations,
+    station  *st,
     size_t    day
 ) {
     s_clear(s);
+
+    size_t title_pad = 2;
+    size_t datas_pad = 4;
+    size_t center_x = s->cols/2;
+    size_t center_y = s->rows/2;
+
+    size_t bar_width = 20;
     
-    /* ========================= TITLE ========================= */
-    s_draw_text_h(s, 2, 1,
-                  "--- MENSA SIMULATION DASHBOARD ---");
-    s_draw_text_h(s, 2, 2,
-                  "Day: %d | Status: %s",
-                  day, ctx->is_day_running ? "RUNNING" : "STOPPED");
+    // --- INTESTAZIONE ---
+    int    inside = ctx->config.nof_users - get_sem_val(ctx->sem.cl_end); 
+    s_draw_text(s, title_pad, 1,
+                  "=== DASHBOARD RESPONSABILE MENSA - GIORNO %zu ===", day);
+    s_draw_text(s, title_pad, 2,
+                  "Stato: %s", 
+                  ctx->is_day_running ? "APERTA" : "CHIUSA");
 
-    // 2. Visualizzazione Tavoli (Semaforo)
-    int free_seats = semctl(ctx->sem.tbl, 0, GETVAL);
-    int occupied   = ctx->config.nof_tbl_seats - free_seats;
+    s_draw_text(s, center_x, 2, "| Utenti in Mensa: ");
 
-    s_draw_text_h(s, 2, 4,
-                  "TABLES: [%d/%d]",
-                  occupied, ctx->config.nof_tbl_seats);
+    s_draw_bar (s, center_x+5, 3, bar_width, inside/(float)ctx->config.nof_users);
     
-    // Barra orizzontale semplice per i tavoli
-    s_repeat_h(s, 15, 4, '#', occupied);
+    s_draw_text(s, center_x+5+bar_width, 3, " %d/%d",
+                                            inside,
+                                            ctx->config.nof_users);
 
-    // 3. Barre Verticali per Piatti Disponibili (Esempio Primi e Secondi)
-    for (int loc = 0; loc < 2; loc++) {
-        int start_x = 5 + (loc * 20);
-        s_draw_text_h(s, start_x, 6, loc == 0 ? "PRIMI" : "SECONDI");
-        
-        for (size_t i = 0; i < ctx->avl_dishes[loc].size; i++) {
-            size_t qty = ctx->avl_dishes[loc].data[i].quantity;
-            size_t max = ctx->config.max_porzioni[loc];
-            int bar_height = (qty * 10) / (max > 0 ? max : 1); // Scala a 10 caratteri
-            
-            s_repeat_v(s, start_x, 17, '|', bar_height);
-            
-            s_draw_text_h(s,
-                start_x + (i * 2), 18,
-                "%zu", ctx->avl_dishes[loc].data[i].id
-            );
-        }
+    // --- 1. STATISTICHE UTENTI ---
+    size_t total_served = 0;
+    for(int i=0; i<4; i++) total_served += st[i].stats.served_dishes;
+
+    size_t tables = ctx->config.nof_tbl_seats;
+
+    s_draw_text(s, title_pad, 5, "[1. UTENTI]");
+    s_draw_text(s, datas_pad, 6, "Serviti (Tot Simulation): %5zu",
+                                  total_served);
+    s_draw_text(s, datas_pad, 7, "Media Giornaliera:       %5.2f",
+                                  (float)total_served / day);
+    s_draw_text(s, datas_pad, 8, "In attesa ai tavoli:      %5d",
+                                  tables - get_sem_val(ctx->sem.tbl));
+
+    // --- 2. TEMPI DI ATTESA MEDI (Per Stazione) ---
+    s_draw_text(s, center_x + title_pad, 5, "[2. ATTESA MEDIA PER STAZIONE]");
+    const char* st_names[] = {"PRIMI:", "SECONDI:", "COFFEE:", "CASSA:"};
+    it (i, 0, NOF_STATIONS) {
+        float avg_wait = st[i].stats.served_dishes > 0 ? 
+            (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0;
+        s_draw_text(s, center_x + datas_pad, 6 + i, "%-8s %5.2f ns", st_names[i], avg_wait);
     }
-
-    // 4. Stazioni e Worker
-    s_draw_text_h(s, 45, 6, "STATIONS STATUS");
+    
+    // --- 3. OPERATORI E PAUSE ---
+    size_t total_breaks = 0;
+    for(int i=0; i<4; i++) total_breaks += st[i].stats.total_breaks;
+    
+    s_draw_text(s, title_pad, 11, "[3. LAVORO E PAUSE]");
+    s_draw_text(s, datas_pad, 12, "Pause Totali Sim: %zu",
+                                              total_breaks);
+    s_draw_text(s, datas_pad, 13, "Media Pause/Giorno: %.2f",
+                                             (float)total_breaks / day);
+    
+    // Monitoraggio lavoratori attivi istantaneo
     for (int i = 0; i < NOF_STATIONS; i++) {
-        int active_wks = stations[i].wk_data.cap - semctl(stations[i].wk_data.sem, 0, GETVAL);
-        s_draw_text_h(s, 45, 7 + i, "ST %d: %d/%zu Workers Active", i, active_wks, stations[i].wk_data.cap);
+        int active = st[i].wk_data.cap - get_sem_val(st[i].wk_data.sem);
+        s_draw_text(s, datas_pad, 14 + i, "ST %d Operatori: %d/%zu",
+                                                      i+1, active, st[i].wk_data.cap);
     }
 
+    // --- 4. STATISTICHE CIBO ---
+    s_draw_text(s, center_x + title_pad, 11, "[4. CIBO E DISTRIBUZIONE]");
+    
+    // Intestazione con spazi fissi per facilitare l'allineamento
+    s_draw_text(s, center_x + datas_pad, 12, "TIPOLOGIA      DISTRIBUITI   AVANZATI");
+    
+    for (int loc = 0; loc < 2; loc++) {
+        size_t leftover = 0;
+        for(size_t j = 0; j < ctx->avl_dishes[loc].size; j++) {
+            leftover += ctx->avl_dishes[loc].data[j].quantity;
+        }
+        s_draw_text(s, center_x + datas_pad, 13 + loc, "%-14s %11zu %10zu", 
+                      loc == 0 ? "PRIMI:" : "SECONDI:", 
+                      st[loc].stats.served_dishes, 
+                      leftover);
+    }
+
+    // --- 5. ECONOMIA ---
+    s_draw_text(s, title_pad, 19, "[5. BILANCIO ECONOMICO]");
+    size_t total_revenue = st[CHECKOUT].stats.earnings;
+    s_draw_text(s, datas_pad, 20, "Incasso Totale:    %6zu EUR", total_revenue);
+    s_draw_text(s, datas_pad, 21, "Media Giornaliera: %6.2f EUR", (float)total_revenue / day);
+
+    s_draw_text(s, title_pad, 25, "Premi [q] per terminare la simulazione");
     s_display(s);
 }
 

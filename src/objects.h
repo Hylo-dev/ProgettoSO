@@ -73,10 +73,10 @@ typedef enum {
 
 typedef struct {
     size_t worked_time;
-    size_t wasted_time;
     size_t served_dishes;
-    size_t left_dishes;
-    size_t earnings; // 0 for all non checkout stations
+    size_t earnings;
+    size_t total_breaks;
+    size_t users_not_served;
 } stats;
 
 typedef struct {

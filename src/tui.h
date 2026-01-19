@@ -13,6 +13,16 @@
 
 #include "tools.h"
 
+#define FULL_BLOCK_CHAR '#' 
+#define EMPTY_BLOCK_CHAR '^'
+
+#define UTF8_FULL_BLOCK "\xe2\x96\x88"
+
+// Colori ANSI 
+#define ANSI_WHITE "\x1b[37m"
+#define ANSI_GRAY  "\x1b[90m"
+#define ANSI_RESET "\x1b[0m"
+
 /* ================= TUI STUFF ================= */
 
 typedef struct {
@@ -56,20 +66,6 @@ init_screen(
     return s;
 }
 
-static inline void
-s_display(screen *s) {
-    const char *clear_and_home = "\x1b[2J\x1b[H";
-    write(STDOUT_FILENO, clear_and_home, 7);
-    
-    write(STDOUT_FILENO, s->buff, s->size);
-    fsync(STDOUT_FILENO);
-}
-
-static inline void
-emergency_reset() {
-    printf("\x1b[?25h\x1b[0m\x1b[2J\x1b[H");
-    fflush(stdout);
-}
 
 static inline void
 free_screen(screen *s) {
@@ -94,7 +90,7 @@ s_put(
 }
 
 static inline void
-s_write_h(
+s_write(
     screen *s,
     size_t  x,
     size_t  y,
@@ -116,7 +112,7 @@ s_write_v(
 }
 
 static inline void
-s_draw_text_h(
+s_draw_text(
     screen *s,
     size_t  x,
     size_t  y,
@@ -129,7 +125,7 @@ s_draw_text_h(
     vsnprintf(temp_buff, sizeof(temp_buff), fmt, ap);
     va_end(ap);
 
-    s_write_h(s, x, y, temp_buff);
+    s_write(s, x, y, temp_buff);
 }
 
 static inline void
@@ -146,19 +142,26 @@ s_draw_text_v(
     vsnprintf(temp_buff, sizeof(temp_buff), fmt, ap);
     va_end(ap);
 
-    s_write_h(s, x, y, temp_buff);
+    s_write(s, x, y, temp_buff);
 }
 
 static inline void
-s_repeat_h(
+s_repeat(
     screen *s,
     size_t  x,
     size_t  y,
     char    c,
-    size_t  times
+    int     times
 ) {
-    for (size_t i = 0; i < times; i++)
-        s_put(s, x+i, y, c);
+    if (times<0) {
+        times = abs(times);
+        for (size_t i = 0; i < times; i++)
+            s_put(s, x-i, y, c);
+    } else {
+        for (size_t i = 0; i < times; i++)
+            s_put(s, x+i, y, c);
+    }
+
 }
 
 static inline void
@@ -167,15 +170,126 @@ s_repeat_v(
     size_t  x,
     size_t  y,
     char    c,
-    size_t  times
+    int  times
 ) {
-    for (size_t i = 0; i < times; i++)
-        s_put(s, x, y - i, c);
+    if (times<0) {
+        times = abs(times);
+        for (size_t i = 0; i < times; i++)
+            s_put(s, x, y - i, c);
+    } else {
+        for (size_t i = 0; i < times; i++)
+            s_put(s, x, y + i, c);
+    }
+}
+
+static inline void
+s_draw_bar(
+    screen *s,
+    size_t  x,
+    size_t  y,
+    int     width,
+    float   percentage
+) {
+    int abs_width = (width < 0) ? -width : width;
+    int filled_units = (int)((float)abs_width * percentage);
+    
+    for (int i = 0; i < abs_width; i++) {
+        int current_x = (width > 0) ? (x + i) : (x - i);
+        
+        if (current_x < 0 || (size_t)current_x >= s->cols) continue;
+
+        if (i < filled_units)
+            s_put(s, (size_t)current_x, (size_t)y, FULL_BLOCK_CHAR); 
+        else 
+            s_put(s, (size_t)current_x, (size_t)y, EMPTY_BLOCK_CHAR); 
+    }
+}
+
+static inline void
+s_draw_bar_v(
+    screen *s,
+    size_t  x,
+    size_t  y,
+    int     height,
+    float   percentage
+) {
+    int abs_height = (height < 0) ? -height : height;
+    int filled_units = (int)((float)abs_height * percentage);
+    
+    for (int i = 0; i < abs_height; i++) {
+        // CORREZIONE: Usa 'y' come base e 'rows' per il limite
+        int current_y = (height > 0) ? (y + i) : (y - i);
+        
+        if (current_y < 0 || (size_t)current_y >= s->rows) continue;
+
+        if (i < filled_units) {
+            s_put(s, x, (size_t)current_y, FULL_BLOCK_CHAR);
+            s_put(s, x + 1, (size_t)current_y, FULL_BLOCK_CHAR);
+        } else { 
+            s_put(s, x, (size_t)current_y, EMPTY_BLOCK_CHAR);
+            s_put(s, x + 1, (size_t)current_y, EMPTY_BLOCK_CHAR);
+        }
+    }
 }
 
 // ================= TERMINAL SETUP =================
 
 static struct termios orig_termios;
+
+
+static inline char
+s_getch() {
+    char c = 0;
+    if (read(STDIN_FILENO, &c, 1) < 0) return 0;
+    return c;
+}
+
+static inline void
+s_display(screen *s) {
+    static char out_buf[256000]; 
+    char *ptr = out_buf;
+    size_t rem = sizeof(out_buf);
+    int written;
+
+    written = snprintf(ptr, rem, "\x1b[H");
+    if (written > 0) {
+        ptr += written;
+        rem -= (size_t)written;
+    }
+
+    for (size_t i = 0; i < s->size; i++) {
+        if (rem < 32) break; 
+        char c = s->buff[i];
+        switch (c) {
+            case FULL_BLOCK_CHAR:
+                written = snprintf(ptr, rem, ANSI_WHITE UTF8_FULL_BLOCK);
+                break;
+            case EMPTY_BLOCK_CHAR:
+                written = snprintf(ptr, rem, ANSI_GRAY UTF8_FULL_BLOCK);
+                break;
+            case '\n':
+                written = snprintf(ptr, rem, ANSI_RESET "\n");
+                break;
+            default:
+                written = snprintf(ptr, rem, ANSI_RESET "%c", c);
+                break;
+        }
+        if (written > 0) {
+            ptr += written;
+            rem -= (size_t)written;
+        }
+    }
+
+    written = snprintf(ptr, rem, ANSI_RESET);
+    if (written > 0) { ptr += written; }
+    write(STDOUT_FILENO, out_buf, (size_t)(ptr - out_buf));
+}
+
+static inline void
+emergency_reset() {
+    printf("\x1b[?25h\x1b[0m\x1b[2J\x1b[H");
+    fflush(stdout);
+}
 
 static inline void
 disableRawMode(void) {

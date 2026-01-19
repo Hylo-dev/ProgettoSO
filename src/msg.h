@@ -25,8 +25,8 @@ typedef struct {
     int    status; // -1: error, 0: OK (response), 1: ok (request)
     dish_t dish;
     size_t price;
+    bool   ticket;
 } msg_t;
-
 
 static int
 send_msg(

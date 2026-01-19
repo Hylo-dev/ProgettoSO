@@ -29,7 +29,10 @@ static struct {
 
 
 /* Prototipi */
-void init_client (shmid_t);
+void init_client (
+    shmid_t,
+    bool
+);
 void init_worker (
     const shmid_t,
     const shmid_t,
@@ -85,8 +88,11 @@ main(void) {
     const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
           station* st     = init_stations(ctx, st_shm);
 
-    it (i, 0, ctx->config.nof_users)
-        init_client(ctx_shm);
+    const size_t client_with_ticket = (size_t)(ctx->config.nof_users * 0.8);
+    it (i, 0, ctx->config.nof_users) {
+        const bool has_ticket = (i < (int)client_with_ticket);
+        init_client(ctx_shm, has_ticket);
+    }
 
     assign_roles(ctx, st);
     it (type, 0, NOF_STATIONS) {
@@ -229,7 +235,7 @@ init_worker (
             itos((int)ctx_id),
             itos((int)st_id ),
             itos((int)idx   ),
-            itos((int)role  ),
+            itos(     role  ),
             NULL 
         };
 
@@ -238,13 +244,16 @@ init_worker (
     }
 }
 
-void init_client(const shmid_t ctx_id) {
+void init_client(
+    const shmid_t ctx_id,
+    const bool    has_ticket
+) {
     const pid_t pid = zfork();
 
     if (pid == 0) {
         char *args[] = {
             "client",
-            rand()%2 ? "1":"0",
+            has_ticket ? "1":"0",
             itos((int)ctx_id),
             NULL
         };

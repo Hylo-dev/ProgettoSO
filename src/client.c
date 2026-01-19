@@ -125,7 +125,8 @@ send_request(
                 "", 0, 0
             },
             .status = REQUEST_OK,
-            .price  = self.loc == CHECKOUT ? (size_t)*price : 0
+            .price  = self.loc == CHECKOUT ? (size_t)*price : 0,
+            .ticket = self.ticket,
         };
 
         switch (self.loc) {

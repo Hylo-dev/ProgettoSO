@@ -174,8 +174,9 @@ work_shift(
             case FIRST_COURSE:
             case MAIN_COURSE:
             case CHECKOUT:
-                serve_client( self, ctx, st, response, variance );
+                serve_client(self, ctx, st, response, variance);
                 break;
+
             case TABLE:
             case EXIT:
                 panic("ERROR: Invalid worker arguments for pid: %d\n",
@@ -253,13 +254,15 @@ _serve_food(
 
 static inline void
 _serve_checkout(
-    const worker_t   *self,
-          station    *st,  
-          msg_t *response
+    station *st,
+    msg_t   *response
 ) {
-    if (self->role == CHECKOUT)
-        st->stats.earnings += response->price;
-        
+          size_t price    = response->price;
+    const size_t discount = (price * DISCOUNT_DISH) / 100;
+
+    price -= discount;
+    st->stats.earnings += price;
+
     response->status = RESPONSE_OK;
 }
 
@@ -272,8 +275,8 @@ serve_client(
     const double    variance
 ){
 
-    size_t avg         = ctx->config.avg_srvc[self->role]; 
-    size_t actual_time = get_service_time(avg, variance);
+    const size_t avg         = ctx->config.avg_srvc[self->role];
+    const size_t actual_time = get_service_time(avg, variance);
 
     zprintf(
         ctx->sem.out,
@@ -288,7 +291,7 @@ serve_client(
     if (self->role != CHECKOUT)
         _serve_food(ctx, self, st, response, actual_time);    
     else
-        _serve_checkout(self, st, response);
+        _serve_checkout(st, response);
 
     sem_signal(ctx->sem.shm);
 }

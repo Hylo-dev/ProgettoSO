@@ -23,16 +23,16 @@ pick_dishes(
 static dish_t
 ask_dish(
     const simctx_t*,
-    client_t,
-    msg_t,
-    msg_t* 
+          client_t*,
+          msg_t,
+          msg_t* 
 );
 
 
 void
 send_request(
     const simctx_t*,
-          client_t,
+          client_t*,
           msg_t*,
           int*
 );
@@ -90,7 +90,7 @@ main(
         int   price = 0;
 
         /* =============== BEGIN OF REQUEST LOOP ============== */
-        send_request(ctx, self, &response, &price);
+        send_request(ctx, &self, &response, &price);
 
         sem_wait(ctx->sem.cl_end);
         if (!ctx->is_sim_running) {
@@ -105,35 +105,36 @@ main(
 void
 send_request(
     const simctx_t *ctx,
-          client_t  self,
+          client_t *self,
           msg_t    *response,
           int      *price
 ){
     while (ctx->is_sim_running && ctx->is_day_running) {
-        if (self.loc < NOF_STATIONS)
-            self.msgq = ctx->id_msg_q[self.loc];
+
+        if (self->loc < NOF_STATIONS)
+            self->msgq = ctx->id_msg_q[self->loc];
 
         const msg_t msg = {
             /* l'mtype contiene:
                  * la priorita' della richiesta se e' il cliente a mandarlo;
                  * il pid del cliente se e' una riposta da parte del worker */
-            .mtype  = (self.loc == CHECKOUT && self.ticket)?
+            .mtype  = (self->loc == CHECKOUT && self->ticket)?
                           TICKET : DEFAULT,
-            .client = self.pid,
+            .client = self->pid,
             .dish   = {
-                self.loc < 3 ? (size_t)self.dishes[self.loc] : 0,
+                self->loc < 3 ? (size_t)self->dishes[self->loc] : 0,
                 "", 0, 0
             },
             .status = REQUEST_OK,
-            .price  = self.loc == CHECKOUT ? (size_t)*price : 0,
-            .ticket = self.ticket,
+            .price  = self->loc == CHECKOUT ? (size_t)*price : 0,
+            .ticket = self->ticket,
         };
 
-        switch (self.loc) {
+        switch (self->loc) {
             case FIRST_COURSE:
             case MAIN_COURSE:
             case COFFEE_BAR:
-                if (self.dishes[self.loc] == -1)
+                if (self->dishes[self->loc] == -1)
                     break;
 
                 const dish_t dish = ask_dish(
@@ -144,14 +145,14 @@ send_request(
                 );
 
                 *price += (int)dish.price;
-                self.dishes[self.loc] = (int)dish.id;
+                self->dishes[self->loc] = (int)dish.id;
 
                 break;
 
             case CHECKOUT:
 
-                send_msg(self.msgq, msg, sizeof(msg_t)-sizeof(long));
-                recive_msg(self.msgq, self.pid, response);
+                send_msg(self->msgq, msg, sizeof(msg_t)-sizeof(long));
+                recive_msg(self->msgq, self->pid, response);
 
                 break;
 
@@ -159,7 +160,7 @@ send_request(
                 zprintf(
                     ctx->sem.out,
                     "CLIENT: %d, %d, WAITING TABLE\n",
-                    self.pid, self.loc
+                    self->pid, self->loc
                 );
 
                 // IMPORTANT: TODO: add clients groups support here
@@ -168,15 +169,15 @@ send_request(
                 zprintf(
                     ctx->sem.out,
                     "CLIENT %d: Found table, Eating for %zu ns\n",
-                    self.pid,
-                    self.wait_time
+                    self->pid,
+                    self->wait_time
                 );
-                znsleep(self.wait_time);
+                znsleep(self->wait_time);
 
                 zprintf(
                     ctx->sem.out,
                     "CLIENT %d: Leaving table\n",
-                    self.pid
+                    self->pid
                 );
                 sem_signal(ctx->sem.tbl);
                 break;
@@ -185,12 +186,12 @@ send_request(
                 zprintf(
                     ctx->sem.out,
                     "CLIENT: %d, EXIT\n",
-                    self.pid
+                    self->pid
                 );
                 return;
         }
 
-        self.loc++;
+        self->loc++;
     }
 }
 
@@ -241,13 +242,13 @@ pick_dishes(
 static dish_t
 ask_dish(
     const simctx_t *ctx,
-          client_t  self,
+          client_t *self,
           msg_t     msg,
           msg_t    *response
 ) {
     do {
         send_msg(
-            self.msgq,
+            self->msgq,
             msg,
             sizeof(msg_t)-sizeof(long)
         );
@@ -255,19 +256,19 @@ ask_dish(
         zprintf(
             ctx->sem.out,
             "CLIENT: id %d, loc %d, WAITING\n",
-            self.pid, self.loc
+            self->pid, self->loc
         );
 
-        recive_msg(self.msgq, self.pid, response);
+        recive_msg(self->msgq, self->pid, response);
 
         zprintf(
             ctx->sem.out,
             "CLIENT: %d, SERVED\n",
-            self.pid
+            self->pid
         );
 
         if (response->status == ERROR) {
-            const size_t menu_size = ctx->menu[self.loc].size;
+            const size_t menu_size = ctx->menu[self->loc].size;
 
             if (menu_size > 1) {
                 size_t temp;
@@ -279,9 +280,9 @@ ask_dish(
                 return msg.dish;
         }
 
-        self.wait_time += response->dish.eating_time;
+        self->wait_time += response->dish.eating_time;
 
     } while (ctx->is_sim_running && response->status == ERROR);
 
-    return msg.dish;
+    return response->dish;
 }

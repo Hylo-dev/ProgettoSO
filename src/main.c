@@ -348,7 +348,8 @@ render_dashboard(
     it (i, 0, NOF_STATIONS) {
         float avg_wait = st[i].stats.served_dishes > 0 ? 
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0;
-        s_draw_text(s, center_x + datas_pad, 6 + i, "%-8s %5.2f ns", st_names[i], avg_wait);
+        s_draw_text(s, center_x + datas_pad, 6 + i,
+                    "%-8s %5.2f ns", st_names[i], avg_wait);
     }
     
     // --- 3. OPERATORI E PAUSE ---
@@ -363,7 +364,7 @@ render_dashboard(
     
     // Monitoraggio lavoratori attivi istantaneo
     for (int i = 0; i < NOF_STATIONS; i++) {
-        int active = st[i].wk_data.cap - get_sem_val(st[i].wk_data.sem);
+        int active = ctx->config.nof_wk_seats[i] - get_sem_val(st[i].wk_data.sem);
         s_draw_text(s, datas_pad, 14 + i, "ST %d Operatori: %d/%zu",
                                                       i+1, active, st[i].wk_data.cap);
     }
@@ -389,7 +390,17 @@ render_dashboard(
     s_draw_text(s, title_pad, 19, "[5. BILANCIO ECONOMICO]");
     size_t total_revenue = st[CHECKOUT].stats.earnings;
     s_draw_text(s, datas_pad, 20, "Incasso Totale:    %6zu EUR", total_revenue);
-    s_draw_text(s, datas_pad, 21, "Media Giornaliera: %6.2f EUR", (float)total_revenue / day);
+    s_draw_text(s, datas_pad, 21, "Media Giornaliera: %6zu EUR",
+                                    (size_t)total_revenue / day);
+
+    // --- 6. DEBUG ---
+    size_t sem_wall = get_sem_val(ctx->sem.wall);
+    size_t sem_wk = get_sem_val(ctx->sem.wk_end);
+    size_t sem_cl = get_sem_val(ctx->sem.cl_end);
+    s_draw_text(s, center_x+title_pad, 19, "[6. DEBUG]");
+    s_draw_text(s, center_x+datas_pad, 21, "Sem WALL:  %d", sem_wall);
+    s_draw_text(s, center_x+datas_pad, 22, "Sem WK:    %d", sem_wk);
+    s_draw_text(s, center_x+datas_pad, 20, "Sem CL:    %d", sem_cl);
 
     s_draw_text(s, title_pad, 25, "Premi [q] per terminare la simulazione");
     s_display(s);

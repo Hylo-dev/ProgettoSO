@@ -150,6 +150,12 @@ work_with_pause(
         // ------------------------------------------------
         sem_signal(st->wk_data.sem);
 
+        // AGGIORNAMENTO STATISTICHE
+        // ------------------------------------------------
+        sem_wait(ctx->sem.shm); 
+        st->stats.total_breaks++;
+        sem_signal(ctx->sem.shm);
+
         self->pause_time += (size_t)ctx->config.stop_duration;
         znsleep((size_t)ctx->config.stop_duration);
     }
@@ -261,8 +267,10 @@ _serve_checkout(
     const size_t discount = (price * DISCOUNT_DISH) / 100;
 
     price -= discount;
+    sem_wait(st->sem);
     st->stats.earnings += price;
-
+    sem_signal(st->sem);
+    
     response->status = RESPONSE_OK;
 }
 

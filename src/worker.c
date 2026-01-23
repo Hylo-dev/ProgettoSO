@@ -31,8 +31,7 @@ work_shift(
     station*,
     size_t,
     msg_t*,
-    size_t*,
-    const worker_t*
+    worker_t*
 );
 
 void
@@ -41,7 +40,6 @@ work_with_pause(
     station*,
     size_t,
     msg_t*,
-    size_t*,
     worker_t*
 );
 
@@ -89,21 +87,21 @@ main(
         const size_t    queue    = ctx->id_msg_q[role];
         const size_t    variance = var_srvc[role];
               msg_t     response;
-              size_t    services;
 
         // attatch self to the mem area in the shm
         sem_wait(st->sem);
         wks[idx] = (worker_t) {
             .pid        = getpid(),
             .role       = role,
-            .pause_time = 0,
             .queue      = queue,
+            .nof_pause  = 0,
+            .pause_time = 0,
         };
         worker_t *self  = &wks[idx];
         sem_signal(st->sem);
 
         /* ===================  WORK LOOP ==================== */
-        work_with_pause(ctx, st, variance, &response, &services, self);
+        work_with_pause(ctx, st, variance, &response, self);
 
         sem_wait(ctx->sem.wk_end);
         if (!ctx->is_sim_running) {
@@ -117,12 +115,11 @@ main(
 
 void
 work_with_pause(
-          simctx_t *ctx,
-          station  *st,
-    const size_t    variance,
-          msg_t    *response,
-          size_t   *services,
-          worker_t *self
+    simctx_t *ctx,
+    station  *st,
+    size_t    variance,
+    msg_t    *response,
+    worker_t *self
 ) {
     while (ctx->is_sim_running && ctx->is_day_running) {
 
@@ -141,10 +138,8 @@ work_with_pause(
                              (t_end.tv_nsec - t_start.tv_nsec);
         self->pause_time += (size_t)wait_ns;
 
-        *services = 0;
-
         /* ====================== WORK ====================== */
-        work_shift(ctx, st, variance, response, services, self);
+        work_shift(ctx, st, variance, response, self);
 
         // 3. RILASCIO IL POSTO (Fine Turno)
         // ------------------------------------------------
@@ -163,12 +158,11 @@ work_with_pause(
 
 void
 work_shift(
-          simctx_t *ctx,
-          station  *st,
-    const size_t    variance,
-          msg_t    *response,
-          size_t   *services,
-    const worker_t *self
+    simctx_t *ctx,
+    station  *st,
+    size_t    variance,
+    msg_t    *response,
+    worker_t *self
 ) {
     while (ctx->is_sim_running && ctx->is_day_running) {
         const ssize_t res = recv_msg_np(self->queue, -DEFAULT, response);
@@ -196,17 +190,21 @@ work_shift(
             sizeof(msg_t) - sizeof(long)
         );
 
-        (*services)++;
+        if (self->nof_pause < (size_t)ctx->config.nof_pause) {
+            if ((rand() % 100) < 15) { 
+                int free_seats = sem_getval(st->wk_data.sem);
+                int active_workers = (int)st->wk_data.cap - free_seats;
 
-        // CHECK_PAUSA: if the served clients are at least nof_pause
-        // leaves the shift
-        if (*services >= (size_t)ctx->config.nof_pause) {
-            zprintf(
-                ctx->sem.out,
-                "Worker %d va in pausa dopo %d servizi\n",
-                    getpid(), *services
-            );
-            break;
+                if (active_workers > 1) {
+                    zprintf(
+                        ctx->sem.out,
+                        "WORKER %d: Vado in pausa (Pausa n.%zu/%d)\n",
+                        getpid(), self->nof_pause + 1, ctx->config.nof_pause
+                    );
+                    self->nof_pause++;
+                    break; 
+                }
+            }
         }
     }
 }

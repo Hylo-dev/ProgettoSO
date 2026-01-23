@@ -38,7 +38,8 @@ typedef struct {
 
     loc_t  role;
     size_t queue;
-
+    
+    size_t nof_pause;
     size_t pause_time;  // cumulative time spent on pause
 } worker_t;
 

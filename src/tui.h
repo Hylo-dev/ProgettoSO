@@ -7,11 +7,13 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <signal.h> // Necessario per gestire CTRL+C
 
 #include <sys/ioctl.h> 
 #include <unistd.h>
 
-#include "tools.h"
+#include "tools.h" // Assumo contenga zmalloc
 
 #define FULL_BLOCK_CHAR '#' 
 #define EMPTY_BLOCK_CHAR '^'
@@ -22,8 +24,12 @@
 #define ANSI_WHITE "\x1b[37m"
 #define ANSI_GRAY  "\x1b[90m"
 #define ANSI_RESET "\x1b[0m"
+#define ANSI_HOME  "\x1b[H"
+#define ANSI_CLEAR "\x1b[2J"
+#define ANSI_HIDE_CURSOR "\x1b[?25l"
+#define ANSI_SHOW_CURSOR "\x1b[?25h"
 
-/* ================= TUI STUFF ================= */
+/* ================= TUI DATA ================= */
 
 typedef struct {
     size_t  rows;
@@ -32,40 +38,68 @@ typedef struct {
     char   *buff;
 } screen;
 
-typedef enum {
-    BLACK = 30, RED     = 31, GREEN = 32, YELLOW = 33,
-    BLUE  = 34, MAGENTA = 35, CYAN  = 36, WHITE  = 37
-} color_t;
+static struct termios orig_termios;
 
+/* ================= UTILS & CLEANUP ================= */
+
+static inline void
+reset_terminal(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    write(STDOUT_FILENO, ANSI_SHOW_CURSOR, sizeof(ANSI_SHOW_CURSOR) - 1);
+    write(STDOUT_FILENO, ANSI_RESET, sizeof(ANSI_RESET) - 1);
+    write(STDOUT_FILENO, ANSI_CLEAR, sizeof(ANSI_CLEAR) - 1);
+    write(STDOUT_FILENO, ANSI_HOME, sizeof(ANSI_HOME) - 1);
+}
+
+// Handler per i segnali (es. CTRL+C)
+static void 
+handle_signal_tui(int sig) {
+    (void)sig; // Unused
+    reset_terminal();
+    exit(0);
+}
+
+static inline void
+enableRawMode(void) {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(reset_terminal);
+    
+    struct sigaction sa;
+    sa.sa_handler = handle_signal_tui;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~((tcflag_t)(ECHO | ICANON));
+    raw.c_iflag &= ~((tcflag_t)(IXON)); 
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 0;
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    
+    write(STDOUT_FILENO, ANSI_HIDE_CURSOR, sizeof(ANSI_HIDE_CURSOR) - 1);
+}
+
+/* ================= SCREEN LOGIC ================= */
 
 static void
 s_clear(screen *s){
-    // sets all the buffer to ' '
     memset(s->buff, ' ', s->size);
-
-    // sets the last col to be '\n'
-    for (size_t y = 0; y < s->rows; y++) {
-        s->buff[y * (s->cols + 1) + s->cols] = '\n';
-    }
-    s->buff[s->size] = '\0'; 
 }
 
 static inline screen*
-init_screen(
-    size_t rows,
-    size_t cols
-) {
+init_screen(size_t rows, size_t cols) {
     screen *s = (screen*)zmalloc(sizeof(screen));
     s->rows   = rows;
     s->cols   = cols;
-    s->size   = rows * (cols + 1); 
-    s->buff   =   (char*)zmalloc(s->size + 1);
+    s->size   = rows * cols; 
+    s->buff   = (char*)zmalloc(s->size);
     
     s_clear(s);
-    
     return s;
 }
-
 
 static inline void
 free_screen(screen *s) {
@@ -75,57 +109,51 @@ free_screen(screen *s) {
     }
 }
 
+/* ================= DRAWING PRIMITIVES ================= */
+
 static inline void
-s_put(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    char    c
-) {
-    if (x >= s->cols || y >= s->rows)
-        return;
-    
-    size_t idx = (size_t)y * (s->cols + 1) + (size_t)x;
-    s->buff[idx] = c;
+s_put(screen *s, size_t x, size_t y, char c) {
+    if (x >= s->cols || y >= s->rows) return;
+    s->buff[y * s->cols + x] = c;
 }
 
 static inline void
-s_write(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    const char* str
-) {
-    for (size_t i = 0; str[i] != '\0'; i++)
+s_write(screen *s, size_t x, size_t y, const char* str) {
+    if (y >= s->rows) return;
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        if (x + i >= s->cols) break;
         s_put(s, x + i, y, str[i]);
+    }
 }
 
 static inline void
-s_write_v(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    const char* str
-) {
-    for (size_t i = 0; str[i] != '\0'; i++)
+s_write_v(screen *s, size_t x, size_t y, const char* str) {
+    if (x >= s->cols) return;
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        if (y + i >= s->rows) break;
         s_put(s, x, y + i, str[i]);
+    }
 }
 
 static inline void
-s_draw_text(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    const char* fmt, ...
-) {
-    char temp_buff[256]; 
-
+s_draw_text(screen *s, size_t x, size_t y, const char* fmt, ...) {
     va_list ap;
+    
     va_start(ap, fmt);
-    vsnprintf(temp_buff, sizeof(temp_buff), fmt, ap);
+    int len = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+    
+    if (len < 0) return;
+
+    size_t size = (size_t)len + 1;
+    char *buf   =  (char*)zmalloc(size);
+
+    va_start(ap, fmt);
+    vsnprintf(buf, size, fmt, ap);
     va_end(ap);
 
-    s_write(s, x, y, temp_buff);
+    s_write(s, x, y, buf);
+    free(buf);
 }
 
 static inline void
@@ -135,50 +163,32 @@ s_draw_text_v(
     size_t  y,
     const char* fmt, ...
 ) {
-    char temp_buff[256]; 
-
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(temp_buff, sizeof(temp_buff), fmt, ap);
+    int len = vsnprintf(NULL, 0, fmt, ap);
     va_end(ap);
 
-    s_write(s, x, y, temp_buff);
+    if (len < 0) return;
+
+    size_t size = (size_t)len + 1;
+    char *buf = (char*)zmalloc(size);
+
+    va_start(ap, fmt);
+    vsnprintf(buf, size, fmt, ap);
+    va_end(ap);
+
+    s_write_v(s, x, y, buf); 
+    free(buf);
 }
 
 static inline void
-s_repeat(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    char    c,
-    int     times
-) {
-    if (times<0) {
-        times = abs(times);
-        for (size_t i = 0; i < times; i++)
-            s_put(s, x-i, y, c);
-    } else {
-        for (size_t i = 0; i < times; i++)
-            s_put(s, x+i, y, c);
-    }
+s_repeat(screen *s, size_t x, size_t y, char c, int times) {
+    int count = (times < 0) ? -times : times;
+    int dir   = (times < 0) ? -1 : 1;
 
-}
-
-static inline void
-s_repeat_v(
-    screen *s,
-    size_t  x,
-    size_t  y,
-    char    c,
-    int  times
-) {
-    if (times<0) {
-        times = abs(times);
-        for (size_t i = 0; i < times; i++)
-            s_put(s, x, y - i, c);
-    } else {
-        for (size_t i = 0; i < times; i++)
-            s_put(s, x, y + i, c);
+    for (int i = 0; i < count; i++) {
+        int curr_x = (int)x + (i * dir);
+        if (curr_x >= 0) s_put(s, (size_t)curr_x, y, c);
     }
 }
 
@@ -191,17 +201,15 @@ s_draw_bar(
     float   percentage
 ) {
     int abs_width = (width < 0) ? -width : width;
-    int filled_units = (int)((float)abs_width * percentage);
+    int filled    = (int)((float)abs_width * percentage);
+    int dir       = (width < 0) ? -1 : 1;
     
     for (int i = 0; i < abs_width; i++) {
-        int current_x = (width > 0) ? (x + i) : (x - i);
-        
-        if (current_x < 0 || (size_t)current_x >= s->cols) continue;
+        int cx = (int)x + (i * dir);
+        if (cx < 0 || (size_t)cx >= s->cols) continue;
 
-        if (i < filled_units)
-            s_put(s, (size_t)current_x, (size_t)y, FULL_BLOCK_CHAR); 
-        else 
-            s_put(s, (size_t)current_x, (size_t)y, EMPTY_BLOCK_CHAR); 
+        char c = (i < filled) ? FULL_BLOCK_CHAR : EMPTY_BLOCK_CHAR;
+        s_put(s, (size_t)cx, y, c);
     }
 }
 
@@ -213,106 +221,63 @@ s_draw_bar_v(
     int     height,
     float   percentage
 ) {
-    int abs_height = (height < 0) ? -height : height;
-    int filled_units = (int)((float)abs_height * percentage);
-    
-    for (int i = 0; i < abs_height; i++) {
-        // CORREZIONE: Usa 'y' come base e 'rows' per il limite
-        int current_y = (height > 0) ? (y + i) : (y - i);
-        
-        if (current_y < 0 || (size_t)current_y >= s->rows) continue;
+    int abs_h  = (height < 0) ? -height : height;
+    int filled = (int)((float)abs_h * percentage);
+    int dir    = (height < 0) ? -1 : 1;
 
-        if (i < filled_units) {
-            s_put(s, x, (size_t)current_y, FULL_BLOCK_CHAR);
-            s_put(s, x + 1, (size_t)current_y, FULL_BLOCK_CHAR);
-        } else { 
-            s_put(s, x, (size_t)current_y, EMPTY_BLOCK_CHAR);
-            s_put(s, x + 1, (size_t)current_y, EMPTY_BLOCK_CHAR);
+    for (int i = 0; i < abs_h; i++) {
+        int cy = (int)y + (i * dir);
+        if (cy < 0 || (size_t)cy >= s->rows) continue;
+
+        char c = (i < filled) ? FULL_BLOCK_CHAR : EMPTY_BLOCK_CHAR;
+        
+        s_put(s, x, (size_t)cy, c);
+        if (x + 1 < s->cols) {
+            s_put(s, x + 1, (size_t)cy, c);
         }
     }
 }
 
-// ================= TERMINAL SETUP =================
-
-static struct termios orig_termios;
-
-
-static inline char
-s_getch() {
-    char c = 0;
-    if (read(STDIN_FILENO, &c, 1) < 0) return 0;
-    return c;
-}
+/* ================= RENDERING (NO FLICKER) ================= */
 
 static inline void
 s_display(screen *s) {
-    static char out_buf[256000]; 
+    size_t max_render_size = (s->size * 15) + (s->rows * 5) + 64; 
+    
+    char *out_buf = (char*)zmalloc(max_render_size);
     char *ptr = out_buf;
-    size_t rem = sizeof(out_buf);
-    int written;
+    
+    strcpy(ptr, ANSI_HOME);
+    ptr += strlen(ANSI_HOME);
 
-    written = snprintf(ptr, rem, "\x1b[H");
-    if (written > 0) {
-        ptr += written;
-        rem -= (size_t)written;
+    bool color_changed = false;
+
+    for (size_t y = 0; y < s->rows; y++) {
+        for (size_t x = 0; x < s->cols; x++) {
+            char c = s->buff[y * s->cols + x];
+            switch (c) {
+                case FULL_BLOCK_CHAR:
+                    ptr += sprintf(ptr, "%s%s", ANSI_WHITE, UTF8_FULL_BLOCK);
+                    color_changed = true;
+                    break;
+                case EMPTY_BLOCK_CHAR:
+                    ptr += sprintf(ptr, "%s%s", ANSI_GRAY, UTF8_FULL_BLOCK);
+                    color_changed = true;
+                    break;
+                default:
+                    if (color_changed) 
+                        ptr += sprintf(ptr, "%s%c", ANSI_RESET, c);
+                    else
+                        ptr += sprintf(ptr, "%c", c);
+                    break;
+            }
+        }
+        ptr += sprintf(ptr, "%s\n", ANSI_RESET);
     }
 
-    for (size_t i = 0; i < s->size; i++) {
-        if (rem < 32) break; 
-        char c = s->buff[i];
-        switch (c) {
-            case FULL_BLOCK_CHAR:
-                written = snprintf(ptr, rem, ANSI_WHITE UTF8_FULL_BLOCK);
-                break;
-            case EMPTY_BLOCK_CHAR:
-                written = snprintf(ptr, rem, ANSI_GRAY UTF8_FULL_BLOCK);
-                break;
-            case '\n':
-                written = snprintf(ptr, rem, ANSI_RESET "\n");
-                break;
-            default:
-                written = snprintf(ptr, rem, ANSI_RESET "%c", c);
-                break;
-        }
-        if (written > 0) {
-            ptr += written;
-            rem -= (size_t)written;
-        }
-    }
-
-    written = snprintf(ptr, rem, ANSI_RESET);
-    if (written > 0) { ptr += written; }
     write(STDOUT_FILENO, out_buf, (size_t)(ptr - out_buf));
-}
-
-static inline void
-emergency_reset() {
-    printf("\x1b[?25h\x1b[0m\x1b[2J\x1b[H");
-    fflush(stdout);
-}
-
-static inline void
-disableRawMode(void) {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-    printf("\x1b[?25h"); // Mostra cursore
-}
-
-static inline void
-enableRawMode(void) {
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(disableRawMode);
-
-    struct termios raw = orig_termios;
     
-    raw.c_lflag &= ~((tcflag_t)(ECHO | ICANON));
-    raw.c_iflag &= ~((tcflag_t)(IXON)); 
-    
-    raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 0;
-
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-    
-    printf("\x1b[?25l");
+    free(out_buf);
 }
 
 static inline void
@@ -321,34 +286,18 @@ get_terminal_size(
     size_t *cols
 ) {
     struct winsize w;
-    
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
-        *rows = 24;
-        *cols = 80;
+        *rows = 24; *cols = 80;
     } else {
-        *rows = w.ws_row;
-        *cols = w.ws_col;
+        *rows = w.ws_row; *cols = w.ws_col;
     }
 }
 
-
-static inline void
-set_color(color_t c) {
-    printf("\x1b[%dm", c);
-}
-
-static inline void
-reset_color(void) {
-    printf("\x1b[0m");
-}
-
-
-static inline void
-clear_screen(void) {
-    // clear the screen
-    printf("\x1b[2J");
-    // move cursor to 0, 0
-    printf("\x1b[H");
+static inline char
+s_getch() {
+    char c = 0;
+    if (read(STDIN_FILENO, &c, 1) < 0) return 0;
+    return c;
 }
 
 #endif

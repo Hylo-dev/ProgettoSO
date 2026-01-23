@@ -47,16 +47,22 @@ void assign_roles(
           station*
 );
 simctx_t* init_ctx(size_t);
+void      release_ctx(shmid_t, simctx_t*);
 station*  init_stations(simctx_t*, size_t);
+void      release_station(station);
 
-screen* init_scr();
-void    kill_scr(screen* s);
+void      release_clients(simctx_t*);
+
+void      kill_all_child(simctx_t*, station*);
+
+screen*   init_scr();
+void      kill_scr(screen* s);
 
 void
 render_dashboard(
-    screen   *s,
-    simctx_t *ctx,
-    station  *stations,
+    screen*,
+    simctx_t*,
+    station*,
     size_t
 );
 
@@ -65,73 +71,64 @@ main(void) {
     /* ========================== INIT ========================== */
     signal(SIGUSR1, SIG_IGN);
     srand((unsigned int)time(NULL));
-    screen* s = init_scr();
+    screen* screen = init_scr();
 
-    const size_t    ctx_shm = zshmget(sizeof(simctx_t));
-          simctx_t* ctx     = init_ctx(ctx_shm);
+    const size_t    ctx_shm  = zshmget(sizeof(simctx_t));
+          simctx_t* ctx      = init_ctx(ctx_shm);
 
-    // // TODO: to remove in production
-    // zprintf(ctx->sem.out, "shm:    %d\n", ctx->sem.shm   );
-    // zprintf(ctx->sem.out, "out:    %d\n", ctx->sem.out   );
-    // zprintf(ctx->sem.out, "tbl:    %d\n", ctx->sem.tbl   );
-    // zprintf(ctx->sem.out, "wall:   %d\n", ctx->sem.wall  );
-    // zprintf(ctx->sem.out, "wk_end: %d\n", ctx->sem.wk_end);
-    // zprintf(ctx->sem.out, "cl_end: %d\n", ctx->sem.cl_end);
-    // zprintf(ctx->sem.out, "\n");
+    const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
+          station*  stations = init_stations(ctx, st_shm);
 
     g_client_pids.id  = zcalloc(ctx->config.nof_users, sizeof(pid_t));
     g_client_pids.cnt = 0;
-    
-    const size_t   st_shm = zshmget(sizeof(station) * NOF_STATIONS);
-          station* st     = init_stations(ctx, st_shm);
+
 
     it (i, 0, ctx->config.nof_users)
         init_client(ctx_shm);
 
-    assign_roles(ctx, st);
-    it (type, 0, NOF_STATIONS) {
-        const size_t cap = st[type].wk_data.cap;
+    assign_roles(ctx, stations);
+    it(type, 0, NOF_STATIONS) {
+        const size_t cap = stations[type].wk_data.cap;
 
         // the `k` index will be the index where the worker will put its data
-        it (k, 0, cap)
-            init_worker(ctx_shm, st_shm, k, (loc_t)type);
+        it(k, 0, cap) init_worker(ctx_shm, st_shm, k, (loc_t)type);
     }
-    
-    it(i, 0, ctx->config.sim_duration)
-        sim_day(ctx, st, i, s);
 
-    ctx->is_sim_running = false;
+    it(i, 0, ctx->config.sim_duration) {
+        if (!ctx->is_sim_running) break; 
+        sim_day(ctx, stations, i, screen);
+    }
+
+    ctx->is_sim_running = false; 
+    ctx->is_day_running = false;
+
     zprintf(ctx->sem.out, "MAIN: Fine sim\n");
 
-    ctx->is_sim_running = false;
-    ctx->is_day_running = false;
-    
     while (true) {
-        s_clear(s);
-        s_draw_text(s, 2, 2, "--- SIMULAZIONE COMPLETATA ---");
-        s_draw_text(s, 2, 4, "Statistiche finali pronte.");
-        s_draw_text(s, 2, 6, "Premi [q] per distruggere IPC e uscire.");
-        s_display(s);
+        s_clear(screen);
+        s_draw_text(screen, 2, 2, "--- SIMULAZIONE COMPLETATA ---");
+        s_draw_text(screen, 2, 4, "Statistiche finali pronte.");
+        s_draw_text(screen, 2, 6, "Premi [q] per distruggere IPC e uscire.");
+        s_display(screen);
 
         if (s_getch() == 'q') break;
         usleep(100000);
     }
 
-    set_sem(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
+    it(i, 0, NOF_STATIONS)
+        release_station(stations[i]);
+
+    shmdt(stations);
+    shm_kill(st_shm);
+    
+    release_clients(ctx);
+
+    sem_set(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
-    shmctl((int)ctx_shm, IPC_RMID, NULL);
-    semctl(ctx->sem.shm   , 0, IPC_RMID);
-    semctl(ctx->sem.out   , 0, IPC_RMID);
-    semctl(ctx->sem.tbl   , 0, IPC_RMID);
-    semctl(ctx->sem.wall  , 0, IPC_RMID);
-    semctl(ctx->sem.wk_end, 0, IPC_RMID);
-    semctl(ctx->sem.cl_end, 0, IPC_RMID);
-
-    it(i, 0, NOF_STATIONS)
-        msgctl((int)ctx->id_msg_q[i], IPC_RMID, NULL);
-
-    kill_scr(s);
+    release_ctx(ctx_shm, ctx);
+    
+    kill_scr(screen);
     return 0;
 }
 
@@ -147,9 +144,9 @@ void sim_day(
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
-    set_sem(ctx->sem.wall,   ctx->config.nof_workers + ctx->config.nof_users);
-    set_sem(ctx->sem.wk_end, ctx->config.nof_workers);
-    set_sem(ctx->sem.cl_end, ctx->config.nof_users  );
+    sem_set(ctx->sem.wall,   ctx->config.nof_workers + ctx->config.nof_users);
+    sem_set(ctx->sem.wk_end, ctx->config.nof_workers);
+    sem_set(ctx->sem.cl_end, ctx->config.nof_users  );
 
     size_t min = 0;
     const size_t avg_refill_time = ctx->config.avg_refill_time;
@@ -190,7 +187,7 @@ void sim_day(
         sem_signal(ctx->sem.shm);
     }
     zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
-    const int size_sem_cl = get_sem_val(ctx->sem.cl_end);
+    const int size_sem_cl = sem_getval(ctx->sem.cl_end);
     if (size_sem_cl >= ctx->config.overload_threshold) {
         zprintf(
             ctx->sem.out,
@@ -214,18 +211,7 @@ void sim_day(
 
     ctx->is_day_running = false;
 
-    it(i, 0, NOF_STATIONS) {
-        const worker_t *wks = get_workers(stations[i].wk_data.shmid);
-        it(j, 0, stations[i].wk_data.cap) {
-            if (wks[j].pid > 0) {
-                kill(wks[j].pid, SIGUSR1);
-            }
-        }
-    }
-    
-    it(i, 0, ctx->config.nof_users) {
-        kill(g_client_pids.id[i], SIGUSR1);
-    }
+    kill_all_child(ctx, stations);
     
     zprintf(ctx->sem.out, "MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.wk_end);
@@ -292,7 +278,7 @@ init_scr() {
 
 void
 kill_scr(screen* s) {
-    disableRawMode();
+    reset_terminal();
     free_screen(s);
 }
 
@@ -308,12 +294,11 @@ render_dashboard(
     size_t title_pad = 2;
     size_t datas_pad = 4;
     size_t center_x = s->cols/2;
-    size_t center_y = s->rows/2;
 
     size_t bar_width = 20;
     
     // --- INTESTAZIONE ---
-    int    inside = ctx->config.nof_users - get_sem_val(ctx->sem.cl_end); 
+    int    inside = ctx->config.nof_users - sem_getval(ctx->sem.cl_end); 
     s_draw_text(s, title_pad, 1,
                   "=== DASHBOARD RESPONSABILE MENSA - GIORNO %zu ===", day);
     s_draw_text(s, title_pad, 2,
@@ -340,7 +325,7 @@ render_dashboard(
     s_draw_text(s, datas_pad, 7, "Media Giornaliera:       %5.2f",
                                   (float)total_served / day);
     s_draw_text(s, datas_pad, 8, "In attesa ai tavoli:      %5d",
-                                  tables - get_sem_val(ctx->sem.tbl));
+                                  tables - sem_getval(ctx->sem.tbl));
 
     // --- 2. TEMPI DI ATTESA MEDI (Per Stazione) ---
     s_draw_text(s, center_x + title_pad, 5, "[2. ATTESA MEDIA PER STAZIONE]");
@@ -364,7 +349,7 @@ render_dashboard(
     
     // Monitoraggio lavoratori attivi istantaneo
     for (int i = 0; i < NOF_STATIONS; i++) {
-        int active = ctx->config.nof_wk_seats[i] - get_sem_val(st[i].wk_data.sem);
+        int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
         s_draw_text(s, datas_pad, 14 + i, "ST %d Operatori: %d/%zu",
                                                       i+1, active, st[i].wk_data.cap);
     }
@@ -394,9 +379,9 @@ render_dashboard(
                                     (size_t)total_revenue / day);
 
     // --- 6. DEBUG ---
-    size_t sem_wall = get_sem_val(ctx->sem.wall);
-    size_t sem_wk = get_sem_val(ctx->sem.wk_end);
-    size_t sem_cl = get_sem_val(ctx->sem.cl_end);
+    size_t sem_wall = sem_getval(ctx->sem.wall);
+    size_t sem_wk = sem_getval(ctx->sem.wk_end);
+    size_t sem_cl = sem_getval(ctx->sem.cl_end);
     s_draw_text(s, center_x+title_pad, 19, "[6. DEBUG]");
     s_draw_text(s, center_x+datas_pad, 21, "Sem WALL:  %d", sem_wall);
     s_draw_text(s, center_x+datas_pad, 22, "Sem WK:    %d", sem_wk);
@@ -468,6 +453,26 @@ init_ctx(
     return ctx;
 }
 
+void
+release_ctx(
+    shmid_t   shmid,
+    simctx_t* ctx
+) {
+    sem_kill(ctx->sem.shm);
+    sem_kill(ctx->sem.out);
+    sem_kill(ctx->sem.tbl);
+    sem_kill(ctx->sem.wall);
+    sem_kill(ctx->sem.wk_end);
+    sem_kill(ctx->sem.cl_end);
+    
+    it(i, 0, NOF_STATIONS)
+        msg_kill((int)ctx->id_msg_q[i]);
+
+    shmdt(ctx);
+
+    shm_kill(shmid); 
+}
+
 station*
 init_stations(
     simctx_t* ctx,
@@ -492,6 +497,47 @@ init_stations(
     }
 
     return st;
+}
+
+void
+release_station(station st) {
+    const worker_t *wks = get_workers(st.wk_data.shmid);
+    
+    it(j, 0, st.wk_data.cap) {
+        kill(wks[j].pid, SIGUSR1);
+        msg_kill(wks[j].queue);
+    }
+    
+    shmdt(wks);
+
+    shm_kill(st.wk_data.shmid);
+    sem_kill(st.wk_data.sem);
+    sem_kill(st.sem);
+}
+
+
+void
+release_clients(simctx_t* ctx) {
+    it(i, 0, ctx->config.nof_users)
+        kill(g_client_pids.id[i], SIGUSR1);
+    // NOTE: here we'll put the group sem_kill, NOT IMPLEMENTED YET
+}
+
+void
+kill_all_child(
+    simctx_t *ctx,
+    station  *stations
+) {
+    it(i, 0, NOF_STATIONS) {
+        const worker_t *wks = get_workers(stations[i].wk_data.shmid);
+        it(j, 0, stations[i].wk_data.cap) {
+            kill(wks[j].pid, SIGUSR1);
+        }
+    }
+    
+    it(i, 0, ctx->config.nof_users) {
+        kill(g_client_pids.id[i], SIGUSR1);
+    }
 }
 
 void

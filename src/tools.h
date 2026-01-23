@@ -46,6 +46,9 @@ panic(const char* fmt, ...) {
     exit(err ? err : EXIT_FAILURE);
 }
 
+
+/* ===================== ALLOC WRAPPER ===================== */
+
 static inline any
 zmalloc(size_t size) {
     any ptr = malloc(size);
@@ -103,6 +106,11 @@ zshmat(
     return res;
 }
 
+static inline int
+shm_kill(shmid_t id) {
+    return shmctl((int)id, IPC_RMID, NULL);
+}
+
 static inline simctx_t*
 get_ctx(size_t shmid) {
     return (simctx_t*)zshmat(shmid);
@@ -132,6 +140,14 @@ zmsgget(
 
     return (size_t)result;
 }
+
+static inline int
+msg_kill(int id) {
+    return msgctl(id, IPC_RMID, NULL);
+}
+
+
+/* ====================== SEM WRAPPER ====================== */
 
 static inline sem_t
 sem_init(const int val) {
@@ -182,7 +198,7 @@ sem_signal(const sem_t sem_id) {
 
 // Operazione: Setta un valore al semaforo
 static inline void
-set_sem(
+sem_set(
     const sem_t id,
     const int   val
 ) {
@@ -205,7 +221,7 @@ sem_wait_zero(const sem_t id) {
 }
 
 static inline int
-get_sem_val(const sem_t id) {
+sem_getval(const sem_t id) {
     const int val = semctl(id, 0, GETVAL);
     if (val == -1)
         panic("ERROR: semctl GETVAL failed\n");
@@ -213,36 +229,9 @@ get_sem_val(const sem_t id) {
     return val;
 }
 
-static void
-zprintf(
-    const sem_t sem_id,
-    const char *fmt, ...
-) {
-    if (!DEBUG) return;
-    
-    va_list args;
-
-    sem_wait(sem_id);
-
-    va_start(args, fmt);
-    vprintf(fmt, args);
-    va_end(args);
-
-    fflush(stdout);
-
-    sem_signal(sem_id);
-}
-
-static inline void
-znsleep(const size_t wait_time) {
-    struct timespec req;
-
-    const size_t total_ns = wait_time * N_NANO_SECS;
-
-    req.tv_sec  = (time_t)(total_ns / TO_NANOSEC);
-    req.tv_nsec = (long)  (total_ns % TO_NANOSEC);
-
-    nanosleep(&req, NULL);
+static inline int
+sem_kill(sem_t sem) {
+    return semctl(sem, 0, IPC_RMID);
 }
 
 
@@ -267,6 +256,42 @@ zfsize(FILE* file) {
 }
 
 /* ======================= SUPPORT  ========================*/
+
+
+static void
+zprintf(
+    const sem_t sem_id,
+    const char *fmt, ...
+) {
+    va_list args;
+
+    sem_wait(sem_id);
+
+    va_start(args, fmt);
+    if (DEBUG) {
+        vprintf(fmt, args);
+        fflush(stdout);
+    } else {
+        FILE *f = fopen("data/simulation.log", "a");
+        vfprintf(f, fmt, args);
+        fclose(f);
+    }
+    va_end(args);
+
+    sem_signal(sem_id);
+}
+
+static inline void
+znsleep(const size_t wait_time) {
+    struct timespec req;
+
+    const size_t total_ns = wait_time * N_NANO_SECS;
+
+    req.tv_sec  = (time_t)(total_ns / TO_NANOSEC);
+    req.tv_nsec = (long)  (total_ns % TO_NANOSEC);
+
+    nanosleep(&req, NULL);
+}
 
 static inline size_t
 atos(const char* str) {
@@ -309,7 +334,9 @@ get_service_time(
 
 
 static inline void
-handle_signal(int sig) { }
+handle_signal(int sig) {
+    (void)sig;
+}
 
 
 #endif

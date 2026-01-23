@@ -165,8 +165,7 @@ sem_init(const int val) {
     return sem_id;
 }
 
-// Operazione P: Decrementa (Wait)
-static inline void
+static inline int
 sem_wait(const sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num =  0;
@@ -174,15 +173,17 @@ sem_wait(const sem_t sem_id) {
     sb.sem_flg =  0;
 
     if (semop(sem_id, &sb, 1) == -1) {
-        if (errno != EINTR) {
-            panic("ERROR: sem_wait failed, id %d\n", sem_id);
+        if (errno == EINTR || errno == EIDRM || errno == EINVAL) {
+            return -1;
         }
+        panic("ERROR: sem_wait failed, id %d, errno %d\n", sem_id, errno);
     }
-
+    return 0;
 }
 
+
 // Operaxzione V: Incrementa (Signal)
-static inline void
+static inline int
 sem_signal(const sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num = 0;
@@ -190,10 +191,13 @@ sem_signal(const sem_t sem_id) {
     sb.sem_flg = 0;
 
     if (semop(sem_id, &sb, 1) == -1) {
-        if (errno != EINTR) {
-            panic("ERROR: sem_signal failed, id %d\n", sem_id);
+        if (errno == EINTR || errno == EIDRM || errno == EINVAL) {
+            return -1;
         }
+        panic("ERROR: sem_signal failed, id %d\n", sem_id);
     }
+
+    return 0;
 }
 
 // Operazione: Setta un valore al semaforo

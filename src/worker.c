@@ -243,9 +243,31 @@ _serve_food(
             
             response->status = RESPONSE_OK;
             response->dish   = dish_info;
-        } else
-            response->status = ERROR;
+        } else {
+            bool any_dish_left = false;
 
+            for (size_t i = 0; i < dishes->size; i++) {
+                if (dishes->data[i].quantity > 0) {
+                    any_dish_left = true;
+                    break;
+                }
+            }
+
+            if (any_dish_left) {
+                zprintf(
+                    ctx->sem.out,
+                    "WORKER: Piatto %zu finito, ma altri disponibili.\n",
+                    dish_id
+                );
+                response->status = RESPONSE_DISH_FINISHED;
+            } else {
+                zprintf(
+                    ctx->sem.out, "WORKER: Stazione %d completamente vuota!\n",
+                    self->role
+                );
+                response->status = RESPONSE_CATEGORY_FINISHED;
+            }
+        }
     } else {
         zprintf(
             ctx->sem.out,

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <string.h>
 
 // NOTE: The client will always pick a maximum of one
 //       dish for the FIRST and one for the MAIN
@@ -20,11 +21,11 @@ pick_dishes(
 );
 
 
-static dish_t
+static bool
 ask_dish(
     const simctx_t*,
           client_t*,
-          msg_t,
+          msg_t*,
           msg_t* 
 );
 
@@ -109,12 +110,13 @@ send_request(
           msg_t    *response,
           int      *price
 ){
+    size_t collected;
     while (ctx->is_sim_running && ctx->is_day_running) {
 
         if (self->loc < NOF_STATIONS)
             self->msgq = ctx->id_msg_q[self->loc];
 
-        const msg_t msg = {
+        msg_t msg = {
             /* l'mtype contiene:
                  * la priorita' della richiesta se e' il cliente a mandarlo;
                  * il pid del cliente se e' una riposta da parte del worker */
@@ -130,6 +132,10 @@ send_request(
             .ticket = self->ticket,
         };
 
+        if (self->loc < 3 && self->dishes[self->loc] != -1) {
+             msg.dish.id = (size_t)self->dishes[self->loc];
+        }
+
         switch (self->loc) {
             case FIRST_COURSE:
             case MAIN_COURSE:
@@ -137,25 +143,27 @@ send_request(
                 if (self->dishes[self->loc] == -1)
                     break;
 
-                const dish_t dish = ask_dish(
-                    ctx,
-                    self,
-                    msg,
-                    response
-                );
+                if (ask_dish(ctx, self, &msg, response)) {
+                    *price += (int)response->dish.price;
+                    self->wait_time += response->dish.eating_time;
+                    collected++;
+                    
+                    self->dishes[self->loc] = (ssize_t)response->dish.id;
 
-                *price += (int)dish.price;
-                self->dishes[self->loc] = (int)dish.id;
-
+                } else {
+                    self->dishes[self->loc] = -1;
+                }
                 break;
 
             case CHECKOUT:
+                if (collected == 0) {
+                    zprintf(ctx->sem.out, "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
+                    return; 
+                }
 
                 send_msg(self->msgq, msg, sizeof(msg_t)-sizeof(long));
                 recive_msg(self->msgq, self->pid, response);
-
                 break;
-
             case TABLE:
                 zprintf(
                     ctx->sem.out,
@@ -208,21 +216,19 @@ pick_dishes(
         cur_loc   = -1;
         cnt_nf    = 0;
 
-        rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); // -1 ..< size
+        rnd = (ssize_t)(rand() % (ctx->menu[FIRST].size + 1) - 1); 
         if (rnd != -1) {
             cur_loc = FIRST_COURSE;
             menu[FIRST] = (ssize_t)ctx->menu[FIRST].data[rnd].id;
-            
         } else {
             cnt_nf++;
             menu[FIRST] = -1;
         }
 
-        rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); // -1 ..< size
+        rnd = (ssize_t)(rand() % (ctx->menu[MAIN].size + 1) - 1); 
         if (rnd != -1) {
             if (cur_loc == -1) cur_loc = MAIN;
             menu[MAIN] = (ssize_t)ctx->menu[MAIN].data[rnd].id;
-            
         } else {
             cnt_nf++;
             menu[MAIN] = -1;
@@ -230,59 +236,85 @@ pick_dishes(
     
         rnd = (ssize_t)(rand() % (ctx->menu[COFFEE].size + 1) - 1);
         if (rnd != -1) {
-            if (cur_loc == -1) cur_loc = COFFEE;
             menu[COFFEE] = (ssize_t)ctx->menu[COFFEE].data[rnd].id;
         } else {
-            cnt_nf++;
             menu[COFFEE] = -1;            
         }
-    } while(cnt_nf == 3);
+
+    } while(menu[FIRST] == -1 && menu[MAIN] == -1);
 }
 
-static dish_t
+static bool
 ask_dish(
     const simctx_t *ctx,
           client_t *self,
-          msg_t     msg,
+          msg_t    *msg,
           msg_t    *response
 ) {
-    do {
-        send_msg(
-            self->msgq,
-            msg,
-            sizeof(msg_t)-sizeof(long)
-        );
+    bool tried[MAX_ELEMENTS];
+    memset(tried, 0, sizeof(tried));
 
-        zprintf(
-            ctx->sem.out,
-            "CLIENT: id %d, loc %d, WAITING\n",
-            self->pid, self->loc
-        );
+    if (msg->dish.id < MAX_ELEMENTS) 
+        tried[msg->dish.id] = true;
 
-        recive_msg(self->msgq, self->pid, response);
+    while (ctx->is_sim_running) {
+        
+        send_msg(self->msgq, *msg, sizeof(msg_t) - sizeof(long));
 
-        zprintf(
-            ctx->sem.out,
-            "CLIENT: %d, SERVED\n",
-            self->pid
-        );
+        zprintf(ctx->sem.out, "CLIENT %d: Chiede piatto %zu a Stazione %d\n", 
+                self->pid, msg->dish.id, self->loc);
 
-        if (response->status == ERROR) {
-            const size_t menu_size = ctx->menu[self->loc].size;
-
-            if (menu_size > 1) {
-                size_t temp;
-                while ((temp = (size_t)rand()%menu_size) == msg.dish.id);
-                msg.dish.id  = temp;
-                msg.mtype    = HIGH;
-
-            } else
-                return msg.dish;
+        int res = recive_msg(self->msgq, self->pid, response);
+        if (res == -1) {
+            return false; 
         }
 
-        self->wait_time += response->dish.eating_time;
+        if (response->status == RESPONSE_OK) {
+            zprintf(ctx->sem.out, "CLIENT %d: Ottenuto piatto %zu\n", self->pid, response->dish.id);
+            return true;
+        }
 
-    } while (ctx->is_sim_running && response->status == ERROR);
+        // CASO 2: Tutta la categoria è finita
+        if (response->status == RESPONSE_CATEGORY_FINISHED) {
+            zprintf(ctx->sem.out, "CLIENT %d: Stazione %d vuota, salto portata.\n", self->pid, self->loc);
+            return false;
+        }
 
-    return response->dish;
+        // CASO 3: Piatto specifico finito, ma ce ne sono altri [cite: 133]
+        if (response->status == RESPONSE_DISH_FINISHED) {
+            zprintf(ctx->sem.out, "CLIENT %d: Piatto %zu finito, cerco alternativa...\n", self->pid, msg->dish.id);
+            
+            ssize_t new_id = -1;
+            const size_t menu_size = ctx->menu[self->loc].size;
+
+            for(int k=0; k<10; k++) {
+                size_t r = (size_t)rand() % menu_size;
+                size_t real_id = ctx->menu[self->loc].data[r].id;
+                if (real_id < MAX_ELEMENTS && !tried[real_id]) {
+                    new_id = (ssize_t)real_id;
+                    break;
+                }
+            }
+
+            if (new_id == -1) {
+                for (size_t i = 0; i < menu_size; i++) {
+                    size_t real_id = ctx->menu[self->loc].data[i].id;
+                    if (real_id < MAX_ELEMENTS && !tried[real_id]) {
+                        new_id = (ssize_t)real_id;
+                        break;
+                    }
+                }
+            }
+
+            if (new_id == -1) {
+                zprintf(ctx->sem.out, "CLIENT %d: Provati tutti i piatti di %d, rinuncio.\n", self->pid, self->loc);
+                return false;
+            }
+
+            msg->dish.id = (size_t)new_id;
+            tried[new_id] = true;
+            
+        } else return false;
+    }
+    return false;
 }

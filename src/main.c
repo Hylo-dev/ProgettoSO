@@ -108,10 +108,15 @@ main(void) {
         s_clear(screen);
         s_draw_text(screen, 2, 2, "--- SIMULAZIONE COMPLETATA ---");
         s_draw_text(screen, 2, 4, "Statistiche finali pronte.");
-        s_draw_text(screen, 2, 6, "Premi [q] per distruggere IPC e uscire.");
-        s_display(screen);
 
-        if (s_getch() == 'q') break;
+        if (s_getch() == 'q') {
+            s_draw_text(screen, 2, 6, "QUITTING...");
+            s_display(screen);
+            break;
+        } else         
+            s_draw_text(screen, 2, 6, "Premi [q] per distruggere IPC e uscire.");
+
+        s_display(screen);
         usleep(100000);
     }
 
@@ -132,11 +137,12 @@ main(void) {
     return 0;
 }
 
-void sim_day(
-          simctx_t *ctx,
-          station  *stations,
-    const size_t    day,
-          screen   *s
+void
+sim_day(
+    simctx_t *ctx,
+    station  *stations,
+    size_t    day,
+    screen   *s
 ) {
     if (day > 0) assign_roles(ctx, stations);
 
@@ -187,28 +193,31 @@ void sim_day(
         sem_signal(ctx->sem.shm);
     }
     zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
-    const int size_sem_cl = sem_getval(ctx->sem.cl_end);
-    if (size_sem_cl >= ctx->config.overload_threshold) {
-        zprintf(
-            ctx->sem.out,
-            "MAIN: Sim end overload\n"
-        );
-        ctx->is_sim_running = false;
 
-        it(i, 0, NOF_STATIONS) {
-            const worker_t *wks = get_workers(stations[i].wk_data.shmid);
-            it(j, 0, stations[i].wk_data.cap) {
-                kill(wks[j].pid, SIGUSR1);
-            }
-        }
-
-        it(i, 0, ctx->config.nof_users) {
-            kill(g_client_pids.id[i], SIGUSR1);
-        }
-
-        return;
+    int users_inside = ctx->config.nof_users - sem_getval(ctx->sem.cl_end);
+    
+    // Se c'è overload o semplicemente fine tempo, quelli dentro non hanno finito -> non serviti
+    if (users_inside > 0) {
+        ctx->global_stats.users_not_served += users_inside;
     }
 
+    // GESTIONE OVERLOAD
+    // -----------------------------------
+    if (users_inside >= ctx->config.overload_threshold) {
+        zprintf(
+            ctx->sem.out, "MAIN: Sim end overload (Users left: %d)\n",
+            users_inside
+        );
+        ctx->is_sim_running = false;
+    }
+    
+    it(i, 0, NOF_STATIONS) {
+        ctx->global_stats.served_dishes += stations[i].stats.served_dishes;
+        ctx->global_stats.earnings      += stations[i].stats.earnings;
+        ctx->global_stats.total_breaks  += stations[i].stats.total_breaks;
+        ctx->global_stats.worked_time   += stations[i].stats.worked_time;
+    }
+    
     ctx->is_day_running = false;
 
     kill_all_child(ctx, stations);
@@ -291,103 +300,117 @@ render_dashboard(
 ) {
     s_clear(s);
 
-    size_t title_pad = 2;
-    size_t datas_pad = 4;
-    size_t center_x = s->cols/2;
-
-    size_t bar_width = 20;
+    // Layout
+    const int col_w    = s->cols / 2; 
+    const int u_total  = ctx->config.nof_users;
     
-    // --- INTESTAZIONE ---
-    int    inside = ctx->config.nof_users - sem_getval(ctx->sem.cl_end); 
-    s_draw_text(s, title_pad, 1,
-                  "=== DASHBOARD RESPONSABILE MENSA - GIORNO %zu ===", day);
-    s_draw_text(s, title_pad, 2,
-                  "Stato: %s", 
-                  ctx->is_day_running ? "APERTA" : "CHIUSA");
+    // Calcolo metriche
+    int u_finished = sem_getval(ctx->sem.cl_end);
+    int u_inside   = u_total - u_finished;
+    int u_eating   = ctx->config.nof_tbl_seats - sem_getval(ctx->sem.tbl);
 
-    s_draw_text(s, center_x, 2, "| Utenti in Mensa: ");
-
-    s_draw_bar (s, center_x+5, 3, bar_width, inside/(float)ctx->config.nof_users);
+    // --- HEADER ---
+    const char* title = "=== OASI DEL GOLFO - DASHBOARD ===";
+    s_draw_text(s, (s->cols - strlen(title))/2, 1, title);
     
-    s_draw_text(s, center_x+5+bar_width, 3, " %d/%d",
-                                            inside,
-                                            ctx->config.nof_users);
+    s_draw_text(s, 2, 2, "GIORNO: %zu/%d | STATO: %s", 
+                day, ctx->config.sim_duration, 
+                ctx->is_day_running ? "APERTA" : "CHIUSA");
 
-    // --- 1. STATISTICHE UTENTI ---
-    size_t total_served = 0;
-    for(int i=0; i<4; i++) total_served += st[i].stats.served_dishes;
+    // Bar Utenti (La barra usa i colori interni della tui.h, quindi ok)
+    s_draw_text(s, 2, 4, "UTENTI NEL SISTEMA: %d/%d", u_inside, u_total);
+    if (u_total > 0)
+        s_draw_bar(s, col_w, 4, 30, (float)u_inside / (float)u_total);
 
-    size_t tables = ctx->config.nof_tbl_seats;
+    // --- COLONNA 1: FLUSSO & ECONOMIA ---
+    int row = 6;
+    s_draw_text(s, 2, row++, "[1. UTENTI]");
+    
+    size_t tot_served = 0;
+    // Recuperiamo i non serviti totali dallo stato globale
+    size_t tot_not_srv = ctx->global_stats.users_not_served; 
+    
+    it(i, 0, NOF_STATIONS) tot_served += st[i].stats.served_dishes;
 
-    s_draw_text(s, title_pad, 5, "[1. UTENTI]");
-    s_draw_text(s, datas_pad, 6, "Serviti (Tot Simulation): %5zu",
-                                  total_served);
-    s_draw_text(s, datas_pad, 7, "Media Giornaliera:       %5.2f",
-                                  (float)total_served / day);
-    s_draw_text(s, datas_pad, 8, "In attesa ai tavoli:      %5d",
-                                  tables - sem_getval(ctx->sem.tbl));
+    float avg_served = (day > 0) ? (float)tot_served/day : 0.0f;
+    float avg_notsrv = (day > 0) ? (float)tot_not_srv/day : 0.0f;
 
-    // --- 2. TEMPI DI ATTESA MEDI (Per Stazione) ---
-    s_draw_text(s, center_x + title_pad, 5, "[2. ATTESA MEDIA PER STAZIONE]");
-    const char* st_names[] = {"PRIMI:", "SECONDI:", "COFFEE:", "CASSA:"};
-    it (i, 0, NOF_STATIONS) {
-        float avg_wait = st[i].stats.served_dishes > 0 ? 
-            (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0;
-        s_draw_text(s, center_x + datas_pad, 6 + i,
-                    "%-8s %5.2f ns", st_names[i], avg_wait);
-    }
-    
-    // --- 3. OPERATORI E PAUSE ---
-    size_t total_breaks = 0;
-    for(int i=0; i<4; i++) total_breaks += st[i].stats.total_breaks;
-    
-    s_draw_text(s, title_pad, 11, "[3. LAVORO E PAUSE]");
-    s_draw_text(s, datas_pad, 12, "Pause Totali Sim: %zu",
-                                              total_breaks);
-    s_draw_text(s, datas_pad, 13, "Media Pause/Giorno: %.2f",
-                                             (float)total_breaks / day);
-    
-    // Monitoraggio lavoratori attivi istantaneo
-    for (int i = 0; i < NOF_STATIONS; i++) {
-        int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
-        s_draw_text(s, datas_pad, 14 + i, "ST %d Operatori: %d/%zu",
-                                                      i+1, active, st[i].wk_data.cap);
-    }
+    s_draw_text(s, 4, row++, "Serviti Totali:   %zu", tot_served);
+    s_draw_text(s, 4, row++, "Serviti Media/Gg: %.1f", avg_served);
+    s_draw_text(s, 4, row++, "Non Serviti Tot:  %zu", tot_not_srv);
+    s_draw_text(s, 4, row++, "Non Serviti Avg:  %.1f", avg_notsrv);
+    s_draw_text(s, 4, row++, "Seduti ai tavoli: %d", u_eating);
 
-    // --- 4. STATISTICHE CIBO ---
-    s_draw_text(s, center_x + title_pad, 11, "[4. CIBO E DISTRIBUZIONE]");
+    row++;
+    s_draw_text(s, 2, row++, "[2. ECONOMIA]");
+    size_t revenue = st[CHECKOUT].stats.earnings;
+    s_draw_text(s, 4, row++, "Incasso Tot:  %zu EUR", revenue);
+    s_draw_text(s, 4, row++, "Media Giorn:  %.2f EUR", day > 0 ? (float)revenue/day : 0.0f);
+
+    row++;
+    s_draw_text(s, 2, row++, "[3. PAUSE OPERATORI]");
+    size_t breaks = 0;
+    it(i, 0, NOF_STATIONS) breaks += st[i].stats.total_breaks;
     
-    // Intestazione con spazi fissi per facilitare l'allineamento
-    s_draw_text(s, center_x + datas_pad, 12, "TIPOLOGIA      DISTRIBUITI   AVANZATI");
+    s_draw_text(s, 4, row++, "Pause Totali: %zu", breaks);
+    s_draw_text(s, 4, row++, "Media/Giorno: %.1f", day > 0 ? (float)breaks/day : 0.0f);
     
-    for (int loc = 0; loc < 2; loc++) {
-        size_t leftover = 0;
-        for(size_t j = 0; j < ctx->avl_dishes[loc].size; j++) {
-            leftover += ctx->avl_dishes[loc].data[j].quantity;
+    // --- COLONNA 2: CIBO & PRESTAZIONI ---
+    row = 6;
+    int col_x = col_w + 2;
+
+    s_draw_text(s, col_x, row++, "[4. STATISTICHE CIBO]");
+    s_draw_text(s, col_x, row++, "TIPO       SERVITI    AVANZATI");
+    
+    const char* labels[] = {"Primi", "Secondi", "Caffe"};
+    const int   types[]  = {FIRST_COURSE, MAIN_COURSE, COFFEE_BAR};
+
+    it(i, 0, 3) {
+        int t = types[i];
+        size_t served = st[t].stats.served_dishes;
+        
+        char left_str[16];
+        if (t == COFFEE_BAR) {
+            sprintf(left_str, "Illimit."); // [cite: 109]
+        } else {
+            size_t leftovers = 0;
+            it(k, 0, ctx->avl_dishes[t].size) 
+                leftovers += ctx->avl_dishes[t].data[k].quantity;
+            sprintf(left_str, "%zu", leftovers);
         }
-        s_draw_text(s, center_x + datas_pad, 13 + loc, "%-14s %11zu %10zu", 
-                      loc == 0 ? "PRIMI:" : "SECONDI:", 
-                      st[loc].stats.served_dishes, 
-                      leftover);
+
+        s_draw_text(s, col_x, row++, "%-10s %-10zu %-10s", labels[i], served, left_str);
     }
 
-    // --- 5. ECONOMIA ---
-    s_draw_text(s, title_pad, 19, "[5. BILANCIO ECONOMICO]");
-    size_t total_revenue = st[CHECKOUT].stats.earnings;
-    s_draw_text(s, datas_pad, 20, "Incasso Totale:    %6zu EUR", total_revenue);
-    s_draw_text(s, datas_pad, 21, "Media Giornaliera: %6zu EUR",
-                                    (size_t)total_revenue / day);
+    row++;
+    s_draw_text(s, col_x, row++, "[5. TEMPI MEDI (ns)]");
+    
+    // Media Globale Ponderata
+    size_t sum_time = 0;
+    size_t sum_ops  = 0;
+    it(i, 0, NOF_STATIONS) {
+        sum_time += st[i].stats.worked_time;
+        sum_ops  += st[i].stats.served_dishes;
+    }
+    float global_wait = sum_ops > 0 ? (float)sum_time / sum_ops : 0.0f;
 
-    // --- 6. DEBUG ---
-    size_t sem_wall = sem_getval(ctx->sem.wall);
-    size_t sem_wk = sem_getval(ctx->sem.wk_end);
-    size_t sem_cl = sem_getval(ctx->sem.cl_end);
-    s_draw_text(s, center_x+title_pad, 19, "[6. DEBUG]");
-    s_draw_text(s, center_x+datas_pad, 21, "Sem WALL:  %d", sem_wall);
-    s_draw_text(s, center_x+datas_pad, 22, "Sem WK:    %d", sem_wk);
-    s_draw_text(s, center_x+datas_pad, 20, "Sem CL:    %d", sem_cl);
+    s_draw_text(s, col_x, row++, "ATTESA MEDIA TOT: %.0f", global_wait);
+    s_draw_text(s, col_x, row++, "------------------------");
+    
+    const char* st_names[] = {"Primi", "Main ", "Caffe", "Cassa"};
+    it(i, 0, NOF_STATIONS) {
+        float avg = st[i].stats.served_dishes > 0 ? 
+            (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
+        
+        int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
+        
+        // Mostra Tempo e Operatori Attivi/Totali
+        s_draw_text(s, col_x, row++, "%s: %6.0f (Wk:%d/%zu)", 
+                    st_names[i], avg, active, st[i].wk_data.cap);
+    }
 
-    s_draw_text(s, title_pad, 25, "Premi [q] per terminare la simulazione");
+    // --- FOOTER ---
+    s_draw_text(s, 2, s->rows - 2, "Premi [q] per terminare la simulazione.");
     s_display(s);
 }
 
@@ -411,15 +434,15 @@ init_ctx(
 
     load_menu("data/menu.json", ctx);
 
-    it (loc, 0, 3){
+    it(loc, 0, 3) {
         struct available_dishes *dishes = &ctx->avl_dishes[loc];
-        it (i, 0, ctx->menu[loc].size) {
+        it(i, 0, ctx->menu[loc].size) {
             dishes->data[i].id = ctx->menu[loc].data[i].id;
 
-            if (loc < COFFEE) {
+            if (loc < COFFEE)
                 dishes->data[i].quantity = ctx->config.avg_refill[loc];
-
-            } else { dishes->data[i].quantity = 99999; }
+            else
+                dishes->data[i].quantity = 99999;
             dishes->size++;
         }
     }
@@ -437,15 +460,15 @@ init_ctx(
     g_priority_list[2] = COFFEE_BAR;
     g_priority_list[3] = CHECKOUT;
 
-    size_t avg1, avg2;
-    it (i, 0, NOF_STATIONS) {
-        it (j, 0, NOF_STATIONS) {
-            avg1 = ctx->config.avg_srvc[g_priority_list[j]];
-            avg2 = ctx->config.avg_srvc[g_priority_list[i]];
-            if (avg1 > avg2) {
-                int temp = g_priority_list[i];
-                g_priority_list[i] = g_priority_list[j];
-                g_priority_list[j] = temp;
+    it(i, 0, NOF_STATIONS - 1) {
+        it(j, 0, NOF_STATIONS - i - 1) {
+            size_t time_a = ctx->config.avg_srvc[g_priority_list[j]];
+            size_t time_b = ctx->config.avg_srvc[g_priority_list[j + 1]];
+
+            if (time_a < time_b) {
+                int temp               = g_priority_list[j];
+                g_priority_list[j]     = g_priority_list[j + 1];
+                g_priority_list[j + 1] = temp;
             }
         }
     }
@@ -464,13 +487,12 @@ release_ctx(
     sem_kill(ctx->sem.wall);
     sem_kill(ctx->sem.wk_end);
     sem_kill(ctx->sem.cl_end);
-    
-    it(i, 0, NOF_STATIONS)
-        msg_kill((int)ctx->id_msg_q[i]);
+
+    it(i, 0, NOF_STATIONS) msg_kill((int)ctx->id_msg_q[i]);
 
     shmdt(ctx);
 
-    shm_kill(shmid); 
+    shm_kill(shmid);
 }
 
 station*
@@ -545,20 +567,44 @@ assign_roles(
     const simctx_t *ctx,
           station  *st
 ) {
-    // the num_workers will never be less than 4
-    // (the load_conf fun gives an error in that case)
     it (i, 0, NOF_STATIONS)
         st[i].wk_data.cap = 0;
 
-    const int num_workers = ctx->config.nof_workers;
-    st[FIRST_COURSE].wk_data.cap++;
-    st[MAIN_COURSE ].wk_data.cap++;
-    st[COFFEE_BAR  ].wk_data.cap++;
-    st[CHECKOUT    ].wk_data.cap++;
+    int total_workers = ctx->config.nof_workers;
+
+    it (i, 0, NOF_STATIONS) {
+        st[i].wk_data.cap = 1;
+    }
+
+    int remaining = total_workers - NOF_STATIONS;
+    if (remaining <= 0) return;
+
+    size_t total_srvc_time = 0;
+    it(i, 0, NOF_STATIONS) {
+        total_srvc_time += ctx->config.avg_srvc[i];
+    }
+
+    if (total_srvc_time == 0) total_srvc_time = 1;
+    int assigned_count = 0;
     
-    it (i, 4, num_workers) {
-        const loc_t target_station_id = g_priority_list[i % 4];
+    it(type, 0, NOF_STATIONS) {
+        size_t weight = ctx->config.avg_srvc[type];
         
-        st[target_station_id].wk_data.cap++;
+        int extra_workers = (int)((weight * remaining) / total_srvc_time);
+        
+        st[type].wk_data.cap += extra_workers;
+        assigned_count       += extra_workers;
+    }
+
+    int leftovers = remaining - assigned_count;
+    int p_idx = 0;
+
+    while (leftovers > 0) {
+        loc_t target = g_priority_list[p_idx];
+        
+        st[target].wk_data.cap++;
+        leftovers--;
+        
+        p_idx = (p_idx + 1) % NOF_STATIONS;
     }
 }

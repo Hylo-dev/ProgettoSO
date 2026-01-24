@@ -154,60 +154,64 @@ sim_day(
     sem_set(ctx->sem.wk_end, ctx->config.nof_workers);
     sem_set(ctx->sem.cl_end, ctx->config.nof_users  );
 
-    size_t min = 0;
-    const size_t avg_refill_time = ctx->config.avg_refill_time;
-    while (ctx->is_sim_running && min < WORK_DAY_MINUTES) {
-        for (int i = 0; i < 5; i++) {
-            render_dashboard(s, ctx, stations, day + 1);
+    size_t current_min = 0;
     
-            if (s_getch() == 'q') {
-                ctx->is_sim_running = false;
-                return;
-            }
-            usleep(50000); 
+    size_t next_refill_min = get_service_time(
+        ctx->config.avg_refill_time, 
+        var_srvc[4]
+    );
+
+    while (ctx->is_sim_running && current_min < WORK_DAY_MINUTES) {
+        
+        if (current_min % DASHBOARD_UPDATE_RATE == 0)
+            render_dashboard(s, ctx, stations, day + 1);
+        
+        if (s_getch() == 'q') {
+            ctx->is_sim_running = false;
+            break;
         }
-        
-        const size_t refill_time = get_service_time(
-            avg_refill_time,
-            var_srvc[4]
-        );
 
-        znsleep(refill_time);
+        znsleep(1); 
+        current_min++;
 
-        min += avg_refill_time;
         
-        sem_wait(ctx->sem.shm);
-        it (loc_idx, 0, 2) {
-                  dish_avl_t *elem_avl = ctx->avl_dishes[loc_idx].data;
-            const size_t      size_avl = ctx->avl_dishes[loc_idx].size;
-            const size_t      max      = ctx->config.max_porzioni[loc_idx];
-            const size_t      refill   = ctx->config.avg_refill[loc_idx];
+        if (current_min >= next_refill_min) {
             
-            it (j, 0, size_avl) {
-                size_t* qty = &elem_avl[j].quantity;
+            zprintf(ctx->sem.out, "MAIN: Eseguo Refill al minuto %zu\n", current_min);
 
-                *qty += refill;
-                if (*qty > max) *qty = max;
+            sem_wait(ctx->sem.shm);
+            it (loc_idx, 0, 2) {
+                dish_avl_t  *elem_avl = ctx->avl_dishes[loc_idx].data;
+                const size_t size_avl = ctx->avl_dishes[loc_idx].size;
+                const size_t max      = ctx->config.max_porzioni[loc_idx];
+                const size_t refill   = ctx->config.avg_refill[loc_idx];
+                
+                it (j, 0, size_avl) {
+                    size_t* qty = &elem_avl[j].quantity;
+                    *qty += refill;
+                    if (*qty > max) *qty = max;
+                }
             }
+            sem_signal(ctx->sem.shm);
+
+            size_t interval = get_service_time(
+                ctx->config.avg_refill_time,
+                var_srvc[4]
+            );
+            next_refill_min = current_min + interval;
         }
-        sem_signal(ctx->sem.shm);
     }
+    
     zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
 
     int users_inside = ctx->config.nof_users - sem_getval(ctx->sem.cl_end);
     
-    // Se c'è overload o semplicemente fine tempo, quelli dentro non hanno finito -> non serviti
     if (users_inside > 0) {
         ctx->global_stats.users_not_served += users_inside;
     }
 
-    // GESTIONE OVERLOAD
-    // -----------------------------------
     if (users_inside >= ctx->config.overload_threshold) {
-        zprintf(
-            ctx->sem.out, "MAIN: Sim end overload (Users left: %d)\n",
-            users_inside
-        );
+        zprintf(ctx->sem.out, "MAIN: Sim end overload (Users left: %d)\n", users_inside);
         ctx->is_sim_running = false;
     }
     
@@ -219,14 +223,11 @@ sim_day(
     }
     
     ctx->is_day_running = false;
-
     kill_all_child(ctx, stations);
     
     zprintf(ctx->sem.out, "MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem.wk_end);
     sem_wait_zero(ctx->sem.cl_end);
-
-    zprintf(ctx->sem.out, "MAIN: Stats da implementare\n");
 }
 
 /* ========================== PROCESSES ========================== */ 

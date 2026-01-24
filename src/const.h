@@ -14,7 +14,6 @@
 #define MAX_ELEMENTS 10
 
 /* =================== SIM. DURATION =================== */
-#define SIM_DURATION 5 /* days */
 #define WORK_DAY_MINUTES 480 /* 8h */
 #define N_NANO_SECS 10000000 /* old: 5, number of real ns for a minute in the sim */
 #define TO_NANOSEC 1000000000L
@@ -30,5 +29,8 @@ static unsigned long var_srvc[] = {
 
 /* ====================== SIM DATA ===================== */
 #define DISHES_COUNT 10
+#define REFILL_INTERVAL 10
+
+#define DASHBOARD_UPDATE_RATE 30
 
 #endif

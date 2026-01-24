@@ -165,22 +165,20 @@ send_request(
                     zprintf(ctx->sem.out, "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
 
                     sem_wait(ctx->sem.shm);
-
                     group->total_members--;
 
                     if (group->members_ready >= group->total_members && group->total_members > 0) {
-                        it (i, 0, group->total_members)
-                            sem_signal(group->sem);
+                        sem_set(group->sem, (int)group->total_members - 1);
                     }
 
                     sem_signal(ctx->sem.shm);
-
                     return;
                 }
 
                 send_msg(self->msgq, msg, sizeof(msg_t)-sizeof(long));
                 recive_msg(self->msgq, self->pid, response);
                 break;
+
             case TABLE:
                 zprintf(
                     ctx->sem.out,
@@ -189,18 +187,16 @@ send_request(
                 );
 
                 sem_wait(ctx->sem.shm);
-
                 group->members_ready++;
 
                 if (group->members_ready == group->total_members) {
-                    it (i, 0, group->total_members)
-                        sem_signal(group->sem);
-
+                    sem_signal(group->sem);
                     sem_signal(ctx->sem.shm);
 
                 } else {
                     sem_signal(ctx->sem.shm);
                     sem_wait(group->sem);
+                    sem_signal(group->sem);
                 }
 
                 // IMPORTANT: TODO: add clients groups support here

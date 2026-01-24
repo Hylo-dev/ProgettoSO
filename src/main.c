@@ -93,7 +93,7 @@ main(void) {
     g_client_pids.cnt = 0;
 
     init_groups(ctx, ctx_shm);
-    
+
     assign_roles(ctx, stations);
     it(type, 0, NOF_STATIONS) {
         const size_t cap = stations[type].wk_data.cap;

@@ -114,15 +114,15 @@ main(void) {
 
     while (true) {
         s_clear(screen);
-        s_draw_text(screen, 2, 2, "--- SIMULAZIONE COMPLETATA ---");
-        s_draw_text(screen, 2, 4, "Statistiche finali pronte.");
+        s_draw_text(screen, 2, 2,COL_WHITE, "--- SIMULAZIONE COMPLETATA ---");
+        s_draw_text(screen, 2, 4,COL_WHITE,  "Statistiche finali pronte.");
 
         if (s_getch() == 'q') {
-            s_draw_text(screen, 2, 6, "QUITTING...");
+            s_draw_text(screen, 2, 6,COL_WHITE, "QUITTING...");
             s_display(screen);
             break;
         } else         
-            s_draw_text(screen, 2, 6, "Premi [q] per distruggere IPC e uscire.");
+                s_draw_text(screen, 2, 6,COL_WHITE, "Premi [q] per distruggere IPC e uscire.");
 
         s_display(screen);
         usleep(100000);
@@ -337,126 +337,178 @@ kill_scr(screen* s) {
     free_screen(s);
 }
 
-void
-render_dashboard(
-    screen   *s,
-    simctx_t *ctx,
-    station  *st,
-    size_t    day
-) {
+void render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
     s_clear(s);
 
-    // Layout
-    const int col_w    = s->cols / 2;
-    const int u_total  = ctx->config.nof_users;
+    // Dimensioni
+    const size_t W = s->cols;
+    const size_t H = s->rows;
+    const size_t mid_x = W / 2; // Punto centrale esatto
+    
+    // --- 1. CORNICE E TITOLO ---
+    draw_box(s, 0, 0, W, H, COL_GRAY);
+    
+    // Titolo centrato (Riga 1, dentro il box)
+    const char* title = " OASI DEL GOLFO - DASHBOARD "; // Spazi per estetica
+    size_t t_len = strlen(title); // Nota: solo ASCII qui, quindi strlen è ok per centrare
+    s_draw_text(s, (W - t_len)/2, 0, COL_WHITE, title); // Disegna SUL bordo (y=0) ma con sfondo nero copre la linea
 
-    // Calcolo metriche
+    // Linea separatrice sotto l'header (Riga 2)
+    draw_hline(s, 1, 2, W-2, COL_GRAY);
+    s_draw_text(s, 0, 2, COL_GRAY, BOX_VR);   // ├
+    s_draw_text(s, W-1, 2, COL_GRAY, BOX_VL); // ┤
+    s_draw_text(s, mid_x, 2, COL_GRAY, BOX_HD); // ┬ (Connettore a T in alto)
+
+    // --- 2. INFO HEADER (Riga 1 - Dentro box sopra linea) ---
+    // Sinistra: Data e Stato
+    s_draw_text(s, 2, 1, COL_GRAY, "GIORNO: %s%zu/%d", ANSI_COLORS[COL_WHITE], day, ctx->config.sim_duration);
+
+    // Destra: Barra Utenti
+    int u_total    = ctx->config.nof_users;
     int u_finished = sem_getval(ctx->sem.cl_end);
     int u_inside   = u_total - u_finished;
-    int u_eating   = ctx->config.nof_tbl_seats - sem_getval(ctx->sem.tbl);
+    
+    if (u_total > 0) {
+        int bar_w = 20; 
+        int bar_x = W - bar_w - 15;
+        float pct = (float)u_inside / (float)u_total;
+        
+        s_draw_text(s, bar_x - 7, 1, COL_GRAY, "Users:");
+        s_draw_bar(s, bar_x, 1, bar_w, pct, COL_WHITE, COL_GRAY);
+        s_draw_text(s, bar_x + bar_w + 1, 1, COL_WHITE, "%d/%d", u_inside, u_total);
+    }
 
-    // --- HEADER ---
-    const char* title = "=== OASI DEL GOLFO - DASHBOARD ===";
-    s_draw_text(s, (s->cols - strlen(title))/2, 1, title);
+    draw_vline(s, mid_x, 3, H - 4, COL_GRAY);
+    s_draw_text(s, mid_x, H-1, COL_GRAY, BOX_HU); // ┴ (T in basso)
 
-    s_draw_text(s, 2, 2, "GIORNO: %zu/%d | STATO: %s",
-                day, ctx->config.sim_duration,
-                ctx->is_day_running ? "APERTA" : "CHIUSA");
-
-    // Bar Utenti (La barra usa i colori interni della tui.h, quindi ok)
-    s_draw_text(s, 2, 4, "UTENTI NEL SISTEMA: %d/%d", u_inside, u_total);
-    if (u_total > 0)
-        s_draw_bar(s, col_w, 4, 30, (float)u_inside / (float)u_total);
-
-    // --- COLONNA 1: FLUSSO & ECONOMIA ---
-    int row = 6;
-    s_draw_text(s, 2, row++, "[1. UTENTI]");
+    size_t r = 4;
+    size_t c1 = 2; // Margine sinistro colonna 1
+    
+    s_draw_text(s, c1, r++, COL_WHITE, "\u25BA STATISTICHE FLUSSO"); 
+    r++; 
 
     size_t tot_served = 0;
-    // Recuperiamo i non serviti totali dallo stato globale
-    const size_t tot_not_srv = ctx->global_stats.users_not_served;
+    size_t tot_breaks = 0;
+    it(i, 0, NOF_STATIONS) {
+        tot_served += st[i].stats.served_dishes;
+        tot_breaks += st[i].stats.total_breaks;
+    }
+    size_t tot_not_srv = ctx->global_stats.users_not_served;
+    size_t u_eating    = ctx->config.nof_tbl_seats - sem_getval(ctx->sem.tbl);
 
-    it(i, 0, NOF_STATIONS) tot_served += st[i].stats.served_dishes;
+    int label_w = 18;
+    s_draw_text(s, c1 + 2, r, COL_GRAY, "Serviti Totali:");
+    s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%zu", tot_served);
 
-    float avg_served = (day > 0) ? (float)tot_served/day : 0.0f;
-    float avg_notsrv = (day > 0) ? (float)tot_not_srv/day : 0.0f;
+    s_draw_text(s, c1 + 2, r, COL_GRAY, "Non Serviti:");
+    s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%zu", tot_not_srv);
 
-    s_draw_text(s, 4, row++, "Serviti Totali:   %zu", tot_served);
-    s_draw_text(s, 4, row++, "Serviti Media/Gg: %.1f", avg_served);
-    s_draw_text(s, 4, row++, "Non Serviti Tot:  %zu", tot_not_srv);
-    s_draw_text(s, 4, row++, "Non Serviti Avg:  %.1f", avg_notsrv);
-    s_draw_text(s, 4, row++, "Seduti ai tavoli: %d", u_eating);
-
-    row++;
-    s_draw_text(s, 2, row++, "[2. ECONOMIA]");
+    s_draw_text(s, c1 + 2, r, COL_GRAY, "Seduti ai tavoli:");
+    s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%d", u_eating);
+    
+    r += 2;
+    
+    // Sezione 2
+    s_draw_text(s, c1, r++, COL_WHITE, "\u25BA ECONOMIA & STAFF");
+    r++;
+    
     size_t revenue = st[CHECKOUT].stats.earnings;
-    s_draw_text(s, 4, row++, "Incasso Tot:  %zu EUR", revenue);
-    s_draw_text(s, 4, row++, "Media Giorn:  %.2f EUR", day > 0 ? (float)revenue/day : 0.0f);
+    s_draw_text(s, c1 + 2, r, COL_GRAY, "Incasso:");
+    s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%zu EUR", revenue);
 
-    row++;
-    s_draw_text(s, 2, row++, "[3. PAUSE OPERATORI]");
-    size_t breaks = 0;
-    it(i, 0, NOF_STATIONS) breaks += st[i].stats.total_breaks;
+    s_draw_text(s, c1 + 2, r, COL_GRAY, "Pause Totali:");
+    s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%zu", tot_breaks);
 
-    s_draw_text(s, 4, row++, "Pause Totali: %zu", breaks);
-    s_draw_text(s, 4, row++, "Media/Giorno: %.1f", day > 0 ? (float)breaks/day : 0.0f);
 
-    // --- COLONNA 2: CIBO & PRESTAZIONI ---
-    row = 6;
-    int col_x = col_w + 2;
-
-    s_draw_text(s, col_x, row++, "[4. STATISTICHE CIBO]");
-    s_draw_text(s, col_x, row++, "TIPO       SERVITI    AVANZATI");
+    // --- 5. COLONNA DESTRA (CUCINA & TEMPI) ---
+    r = 4;
+    size_t c2 = mid_x + 3; // Margine sinistro colonna 2
+    
+    s_draw_text(s, c2, r++, COL_WHITE, "\u25BA SITUAZIONE CUCINA");
+    r++;
+    
+    // DEFINIZIONE OFFSETS COLONNE (La soluzione al problema di allineamento)
+    // Relative a c2
+    int off_p = 0;  // Piatto
+    int off_s = 14; // Serviti
+    int off_r = 24; // Rimasti
+    
+    // Header Tabella
+    s_draw_text(s, c2 + off_p, r, COL_GRAY, "PIATTO");
+    s_draw_text(s, c2 + off_s, r, COL_GRAY, "SERVITI");
+    s_draw_text(s, c2 + off_r, r, COL_GRAY, "RIMASTI");
+    r++;
+    
+    // Linea sottile sotto header
+    draw_hline(s, c2, r++, 32, COL_GRAY);
 
     const char* labels[] = {"Primi", "Secondi", "Caffe"};
     const int   types[]  = {FIRST_COURSE, MAIN_COURSE, COFFEE_BAR};
 
     it(i, 0, 3) {
         int t = types[i];
-        size_t served = st[t].stats.served_dishes;
-
-        char left_str[16];
+        size_t srv = st[t].stats.served_dishes;
+        
+        // Colonna 1: Nome
+        s_draw_text(s, c2 + off_p, r, COL_WHITE, "%s", labels[i]);
+        
+        // Colonna 2: Serviti
+        s_draw_text(s, c2 + off_s, r, COL_WHITE, "%zu", srv);
+        
+        // Colonna 3: Rimasti
         if (t == COFFEE_BAR) {
-            sprintf(left_str, "Illimit."); // [cite: 109]
+             s_draw_text(s, c2 + off_r, r, COL_WHITE, "\u221E"); // Simbolo Infinito
         } else {
             size_t leftovers = 0;
-            it(k, 0, ctx->avl_dishes[t].size)
-                leftovers += ctx->avl_dishes[t].data[k].quantity;
-            sprintf(left_str, "%zu", leftovers);
+            it(k, 0, ctx->avl_dishes[t].size) leftovers += ctx->avl_dishes[t].data[k].quantity;
+            
+            // Cambio colore se scarseggia il cibo (< 10 porzioni)
+            uint8_t col = (leftovers < 10) ? COL_WHITE : COL_GRAY; // O rosso se lo implementi
+            s_draw_text(s, c2 + off_r, r, col, "%zu", leftovers);
         }
-
-        s_draw_text(s, col_x, row++, "%-10s %-10zu %-10s", labels[i], served, left_str);
+        r++;
     }
 
-    row++;
-    s_draw_text(s, col_x, row++, "[5. TEMPI MEDI (ns)]");
-
-    // Media Globale Ponderata
-    size_t sum_time = 0;
-    size_t sum_ops  = 0;
-    it(i, 0, NOF_STATIONS) {
-        sum_time += st[i].stats.worked_time;
-        sum_ops  += st[i].stats.served_dishes;
-    }
-    float global_wait = sum_ops > 0 ? (float)sum_time / sum_ops : 0.0f;
-
-    s_draw_text(s, col_x, row++, "ATTESA MEDIA TOT: %.0f", global_wait);
-    s_draw_text(s, col_x, row++, "------------------------");
-
+    r += 2;
+    s_draw_text(s, c2, r++, COL_WHITE, "\u25BA EFFICIENZA STAZIONI");
+    r++;
+    
     const char* st_names[] = {"Primi", "Main ", "Caffe", "Cassa"};
     it(i, 0, NOF_STATIONS) {
         float avg = st[i].stats.served_dishes > 0 ?
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
-
+            
         int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
-
-        // Mostra Tempo e Operatori Attivi/Totali
-        s_draw_text(s, col_x, row++, "%s: %6.0f (Wk:%d/%zu)",
-                    st_names[i], avg, active, st[i].wk_data.cap);
+        int cap    = (int)st[i].wk_data.cap;
+        
+        // Nome
+        s_draw_text(s, c2, r, COL_GRAY, "%s:", st_names[i]);
+        
+        // Tempo (Allineato a destra manualmente)
+        char time_str[16];
+        sprintf(time_str, "%.0fns", avg);
+        s_draw_text(s, c2 + 7, r, COL_WHITE, "%6s", time_str);
+        
+        // Visualizzatore Operatori [■_]
+        // Lo spostiamo un po' più a destra per non accavallare
+        int bar_x = c2 + 18;
+        s_draw_text(s, bar_x, r, COL_GRAY, "[");
+        
+        for(int k=0; k<cap; k++) {
+            // Se k < active, operatore al lavoro
+            if (k < active) 
+                s_draw_text(s, bar_x + 1 + k, r, COL_WHITE, "\u25A0"); // Quadrato pieno
+            else 
+                s_draw_text(s, bar_x + 1 + k, r, COL_GRAY, "_"); 
+        }
+        s_draw_text(s, bar_x + 1 + cap, r, COL_GRAY, "]");
+        
+        r++;
     }
 
-    // --- FOOTER ---
-    s_draw_text(s, 2, s->rows - 2, "Premi [q] per terminare la simulazione.");
+    // --- 6. FOOTER ---
+    s_draw_text(s, 2, H - 2, COL_GRAY, "Premi [q] per terminare la simulazione.");
+    
     s_display(s);
 }
 

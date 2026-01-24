@@ -29,7 +29,12 @@ static struct {
 
 
 /* Prototipi */
-void init_client (shmid_t);
+void
+init_groups(
+    simctx_t*,
+    shmid_t
+);
+void init_client (shmid_t, size_t);
 void init_worker (
     const shmid_t,
     const shmid_t,
@@ -46,7 +51,7 @@ void assign_roles(
     const simctx_t*,
           station*
 );
-simctx_t* init_ctx(size_t);
+simctx_t* init_ctx(size_t, conf_t);
 void      release_ctx(shmid_t, simctx_t*);
 station*  init_stations(simctx_t*, size_t);
 void      release_station(station);
@@ -73,8 +78,13 @@ main(void) {
     srand((unsigned int)time(NULL));
     screen* screen = init_scr();
 
-    const size_t    ctx_shm  = zshmget(sizeof(simctx_t));
-          simctx_t* ctx      = init_ctx(ctx_shm);
+    conf_t conf = {};
+    load_config("data/config.json", &conf);
+
+    const size_t ctx_shm  = zshmget(
+        sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t))
+    );
+    simctx_t* ctx = init_ctx(ctx_shm, conf);
 
     const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
           station*  stations = init_stations(ctx, st_shm);
@@ -82,10 +92,8 @@ main(void) {
     g_client_pids.id  = zcalloc(ctx->config.nof_users, sizeof(pid_t));
     g_client_pids.cnt = 0;
 
-
-    it (i, 0, ctx->config.nof_users)
-        init_client(ctx_shm);
-
+    init_groups(ctx, ctx_shm);
+    
     assign_roles(ctx, stations);
     it(type, 0, NOF_STATIONS) {
         const size_t cap = stations[type].wk_data.cap;
@@ -247,7 +255,7 @@ init_worker (
             itos((int)ctx_id),
             itos((int)st_id ),
             itos((int)idx   ),
-            itos((int)role  ),
+            itos(     role  ),
             NULL 
         };
 
@@ -257,8 +265,44 @@ init_worker (
 }
 
 void
+init_groups(
+          simctx_t *ctx,
+    const shmid_t   ctx_shm
+) {
+    size_t users_remaining = ctx->config.nof_users;
+    size_t group_idx = 0;
+    size_t members_current_group = 0;
+    size_t target_size = 0;
+
+    it (i, 0, ctx->config.nof_users) {
+
+        if (members_current_group == 0) {
+            target_size = (rand() % ctx->config.max_users_per_group) + 1;
+
+            if (target_size > users_remaining)
+                target_size = users_remaining;
+
+            ctx->groups[group_idx].id            = group_idx;
+            ctx->groups[group_idx].total_members = target_size;
+            ctx->groups[group_idx].members_ready = 0;
+            ctx->groups[group_idx].sem           = sem_init(0);
+
+            members_current_group = target_size;
+        }
+
+        init_client(ctx_shm, group_idx);
+
+        members_current_group--;
+        users_remaining--;
+
+        if (members_current_group == 0) group_idx++;
+    }
+}
+
+void
 init_client(
-    const shmid_t ctx_id
+    const shmid_t ctx_id,
+    const size_t  group_idx
 ) {
     const pid_t pid = zfork();
 
@@ -267,6 +311,7 @@ init_client(
             "client",
             rand()%2 ? "1":"0",
             itos((int)ctx_id),
+            itos((int)group_idx),
             NULL
         };
         execve("./bin/client", args, NULL);
@@ -302,9 +347,9 @@ render_dashboard(
     s_clear(s);
 
     // Layout
-    const int col_w    = s->cols / 2; 
+    const int col_w    = s->cols / 2;
     const int u_total  = ctx->config.nof_users;
-    
+
     // Calcolo metriche
     int u_finished = sem_getval(ctx->sem.cl_end);
     int u_inside   = u_total - u_finished;
@@ -313,9 +358,9 @@ render_dashboard(
     // --- HEADER ---
     const char* title = "=== OASI DEL GOLFO - DASHBOARD ===";
     s_draw_text(s, (s->cols - strlen(title))/2, 1, title);
-    
-    s_draw_text(s, 2, 2, "GIORNO: %zu/%d | STATO: %s", 
-                day, ctx->config.sim_duration, 
+
+    s_draw_text(s, 2, 2, "GIORNO: %zu/%d | STATO: %s",
+                day, ctx->config.sim_duration,
                 ctx->is_day_running ? "APERTA" : "CHIUSA");
 
     // Bar Utenti (La barra usa i colori interni della tui.h, quindi ok)
@@ -326,11 +371,11 @@ render_dashboard(
     // --- COLONNA 1: FLUSSO & ECONOMIA ---
     int row = 6;
     s_draw_text(s, 2, row++, "[1. UTENTI]");
-    
+
     size_t tot_served = 0;
     // Recuperiamo i non serviti totali dallo stato globale
-    size_t tot_not_srv = ctx->global_stats.users_not_served; 
-    
+    const size_t tot_not_srv = ctx->global_stats.users_not_served;
+
     it(i, 0, NOF_STATIONS) tot_served += st[i].stats.served_dishes;
 
     float avg_served = (day > 0) ? (float)tot_served/day : 0.0f;
@@ -352,30 +397,30 @@ render_dashboard(
     s_draw_text(s, 2, row++, "[3. PAUSE OPERATORI]");
     size_t breaks = 0;
     it(i, 0, NOF_STATIONS) breaks += st[i].stats.total_breaks;
-    
+
     s_draw_text(s, 4, row++, "Pause Totali: %zu", breaks);
     s_draw_text(s, 4, row++, "Media/Giorno: %.1f", day > 0 ? (float)breaks/day : 0.0f);
-    
+
     // --- COLONNA 2: CIBO & PRESTAZIONI ---
     row = 6;
     int col_x = col_w + 2;
 
     s_draw_text(s, col_x, row++, "[4. STATISTICHE CIBO]");
     s_draw_text(s, col_x, row++, "TIPO       SERVITI    AVANZATI");
-    
+
     const char* labels[] = {"Primi", "Secondi", "Caffe"};
     const int   types[]  = {FIRST_COURSE, MAIN_COURSE, COFFEE_BAR};
 
     it(i, 0, 3) {
         int t = types[i];
         size_t served = st[t].stats.served_dishes;
-        
+
         char left_str[16];
         if (t == COFFEE_BAR) {
             sprintf(left_str, "Illimit."); // [cite: 109]
         } else {
             size_t leftovers = 0;
-            it(k, 0, ctx->avl_dishes[t].size) 
+            it(k, 0, ctx->avl_dishes[t].size)
                 leftovers += ctx->avl_dishes[t].data[k].quantity;
             sprintf(left_str, "%zu", leftovers);
         }
@@ -385,7 +430,7 @@ render_dashboard(
 
     row++;
     s_draw_text(s, col_x, row++, "[5. TEMPI MEDI (ns)]");
-    
+
     // Media Globale Ponderata
     size_t sum_time = 0;
     size_t sum_ops  = 0;
@@ -397,16 +442,16 @@ render_dashboard(
 
     s_draw_text(s, col_x, row++, "ATTESA MEDIA TOT: %.0f", global_wait);
     s_draw_text(s, col_x, row++, "------------------------");
-    
+
     const char* st_names[] = {"Primi", "Main ", "Caffe", "Cassa"};
     it(i, 0, NOF_STATIONS) {
-        float avg = st[i].stats.served_dishes > 0 ? 
+        float avg = st[i].stats.served_dishes > 0 ?
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
-        
+
         int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
-        
+
         // Mostra Tempo e Operatori Attivi/Totali
-        s_draw_text(s, col_x, row++, "%s: %6.0f (Wk:%d/%zu)", 
+        s_draw_text(s, col_x, row++, "%s: %6.0f (Wk:%d/%zu)",
                     st_names[i], avg, active, st[i].wk_data.cap);
     }
 
@@ -421,14 +466,16 @@ render_dashboard(
 
 simctx_t*
 init_ctx(
-    const size_t shm_id
+    const size_t shm_id,
+    const conf_t conf
 ) {
     simctx_t* ctx = get_ctx(shm_id);
 
     memset(ctx, 0, sizeof(simctx_t));
     ctx->is_sim_running = true;
 
-    load_config("data/config.json", &ctx->config);
+    ctx->config = conf;
+    // load_config("data/config.json", &ctx->config);
  
     it (i, 0, NOF_STATIONS)
         ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
@@ -463,11 +510,11 @@ init_ctx(
 
     it(i, 0, NOF_STATIONS - 1) {
         it(j, 0, NOF_STATIONS - i - 1) {
-            size_t time_a = ctx->config.avg_srvc[g_priority_list[j]];
-            size_t time_b = ctx->config.avg_srvc[g_priority_list[j + 1]];
+            const size_t time_a = ctx->config.avg_srvc[g_priority_list[j]];
+            const size_t time_b = ctx->config.avg_srvc[g_priority_list[j + 1]];
 
             if (time_a < time_b) {
-                int temp               = g_priority_list[j];
+                const int temp         = g_priority_list[j];
                 g_priority_list[j]     = g_priority_list[j + 1];
                 g_priority_list[j + 1] = temp;
             }
@@ -488,6 +535,8 @@ release_ctx(
     sem_kill(ctx->sem.wall);
     sem_kill(ctx->sem.wk_end);
     sem_kill(ctx->sem.cl_end);
+
+    it (i, 0, ctx->config.nof_users) sem_kill(ctx->groups[i].sem);
 
     it(i, 0, NOF_STATIONS) msg_kill((int)ctx->id_msg_q[i]);
 
@@ -571,7 +620,7 @@ assign_roles(
     it (i, 0, NOF_STATIONS)
         st[i].wk_data.cap = 0;
 
-    int total_workers = ctx->config.nof_workers;
+    const int total_workers = ctx->config.nof_workers;
 
     it (i, 0, NOF_STATIONS) {
         st[i].wk_data.cap = 1;
@@ -601,7 +650,7 @@ assign_roles(
     int p_idx = 0;
 
     while (leftovers > 0) {
-        loc_t target = g_priority_list[p_idx];
+        const loc_t target = g_priority_list[p_idx];
         
         st[target].wk_data.cap++;
         leftovers--;

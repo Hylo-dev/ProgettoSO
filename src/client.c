@@ -16,8 +16,8 @@
 //       dish for the FIRST and one for the MAIN
 void
 pick_dishes(
-          ssize_t*,
-    const simctx_t*
+           ssize_t*,
+    const  simctx_t*
 );
 
 
@@ -32,10 +32,11 @@ ask_dish(
 
 void
 send_request(
-    const simctx_t*,
-          client_t*,
-          msg_t*,
-          int*
+    const  simctx_t*,
+           client_t*,
+           msg_t*,
+           int*,
+    struct groups_t*
 );
 
 
@@ -49,15 +50,16 @@ main(
      *    exec name,
      *    ticket,
      *    ctx_shmid,
+     *    group_id
      * } */
-    if (argc != 3)
+    if (argc != 4)
         panic("ERROR: Invalid client arguments for pid: %d", getpid());
 
     /* ====================== INIT ======================= */
 
     const bool   ticket  = atob(argv[1]);
     const size_t shmid   = atos(argv[2]);
-
+    const size_t grp_id  = atos(argv[3]);
 
     struct sigaction sa;
     sa.sa_handler = handle_signal;
@@ -66,7 +68,8 @@ main(
     sigaction(SIGUSR1, &sa, NULL);
 
     while (true) {
-        const simctx_t *ctx = get_ctx(shmid);
+        const simctx_t  *ctx = get_ctx(shmid);
+        struct groups_t *group = (struct groups_t*)&ctx->groups[grp_id];
         zprintf(
             ctx->sem.out,
             "CLIENT: Waiting new day\n"
@@ -91,7 +94,7 @@ main(
         int   price = 0;
 
         /* =============== BEGIN OF REQUEST LOOP ============== */
-        send_request(ctx, &self, &response, &price);
+        send_request(ctx, &self, &response, &price, group);
 
         sem_wait(ctx->sem.cl_end);
         if (!ctx->is_sim_running) {
@@ -105,12 +108,14 @@ main(
 
 void
 send_request(
-    const simctx_t *ctx,
-          client_t *self,
-          msg_t    *response,
-          int      *price
+    const  simctx_t *ctx,
+           client_t *self,
+           msg_t    *response,
+           int      *price,
+    struct groups_t *group
+
 ){
-    size_t collected;
+    size_t collected = 0;
     while (ctx->is_sim_running && ctx->is_day_running) {
 
         if (self->loc < NOF_STATIONS)
@@ -158,7 +163,19 @@ send_request(
             case CHECKOUT:
                 if (collected == 0) {
                     zprintf(ctx->sem.out, "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
-                    return; 
+
+                    sem_wait(ctx->sem.shm);
+
+                    group->total_members--;
+
+                    if (group->members_ready >= group->total_members && group->total_members > 0) {
+                        it (i, 0, group->total_members)
+                            sem_signal(group->sem);
+                    }
+
+                    sem_signal(ctx->sem.shm);
+
+                    return;
                 }
 
                 send_msg(self->msgq, msg, sizeof(msg_t)-sizeof(long));
@@ -170,6 +187,21 @@ send_request(
                     "CLIENT: %d, %d, WAITING TABLE\n",
                     self->pid, self->loc
                 );
+
+                sem_wait(ctx->sem.shm);
+
+                group->members_ready++;
+
+                if (group->members_ready == group->total_members) {
+                    it (i, 0, group->total_members)
+                        sem_signal(group->sem);
+
+                    sem_signal(ctx->sem.shm);
+
+                } else {
+                    sem_signal(ctx->sem.shm);
+                    sem_wait(group->sem);
+                }
 
                 // IMPORTANT: TODO: add clients groups support here
                 sem_wait(ctx->sem.tbl);
@@ -220,6 +252,7 @@ pick_dishes(
         if (rnd != -1) {
             cur_loc = FIRST_COURSE;
             menu[FIRST] = (ssize_t)ctx->menu[FIRST].data[rnd].id;
+
         } else {
             cnt_nf++;
             menu[FIRST] = -1;
@@ -229,6 +262,7 @@ pick_dishes(
         if (rnd != -1) {
             if (cur_loc == -1) cur_loc = MAIN;
             menu[MAIN] = (ssize_t)ctx->menu[MAIN].data[rnd].id;
+
         } else {
             cnt_nf++;
             menu[MAIN] = -1;

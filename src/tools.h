@@ -134,7 +134,7 @@ zmsgget(
     const key_t key,
     const int   mode
 ) {
-    int result = msgget(key, mode);
+    const int result = msgget(key, mode);
     if (result < 0)
         panic("ERROR: Creation message queue is failed\n");
 

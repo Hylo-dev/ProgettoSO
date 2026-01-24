@@ -2,8 +2,6 @@
 #define _OBJECTS_H
 
 #include "const.h"
-#include <stddef.h>
-#include <stdbool.h>
 #include <sys/types.h>
 
 #define DISH_NAME_MAX_LEN 32
@@ -172,6 +170,13 @@ typedef struct {
 
     bool is_sim_running;
     bool is_day_running;
+
+    struct groups_t {
+        size_t id;
+        size_t total_members;
+        size_t members_ready;
+        sem_t  sem;
+    } groups[];
 
 } simctx_t;
 

@@ -24,10 +24,11 @@ ALL_APP_SOURCES = $(wildcard $(APP_DIR)/*.c)
 
 # B. Lista dei file che contengono il 'main' (Entry Points)
 # Questi NON devono essere linkati tra loro!
-MAIN_SRC   = $(APP_DIR)/main.c
-WORKER_SRC = $(APP_DIR)/worker.c
-CLIENT_SRC = $(APP_DIR)/client.c
-EXCLUDED_SRCS = $(MAIN_SRC) $(WORKER_SRC) $(CLIENT_SRC)
+MAIN_SRC      = $(APP_DIR)/main.c
+WORKER_SRC    = $(APP_DIR)/worker.c
+CLIENT_SRC    = $(APP_DIR)/client.c
+DISORDER_SRC  = $(APP_DIR)/disorder.c
+EXCLUDED_SRCS = $(MAIN_SRC) $(WORKER_SRC) $(CLIENT_SRC) $(DISORDER_SRC)
 
 # C. Calcola i file Comuni (Sottrae i Main da Tutti i sorgenti)
 # Se aggiungi menu.c o utils.c, finiscono qui automaticamente.
@@ -35,9 +36,10 @@ COMMON_SOURCES = $(filter-out $(EXCLUDED_SRCS), $(ALL_APP_SOURCES))
 COMMON_OBJECTS = $(patsubst $(APP_DIR)/%.c, $(OBJDIR)/app/%.o, $(COMMON_SOURCES))
 
 # D. Definisci gli oggetti degli Entry Points
-OBJ_MAIN   = $(OBJDIR)/app/main.o
-OBJ_WORKER = $(OBJDIR)/app/worker.o
-OBJ_CLIENT = $(OBJDIR)/app/client.o
+OBJ_MAIN     = $(OBJDIR)/app/main.o
+OBJ_WORKER   = $(OBJDIR)/app/worker.o
+OBJ_CLIENT   = $(OBJDIR)/app/client.o
+OBJ_DISORDER = $(OBJDIR)/app/disorder.o 
 
 # E. Libreria Esterna (libds)
 LIB_SOURCES = $(wildcard $(LIB_DIR)/*.c)
@@ -48,10 +50,11 @@ TEST_SRC    = $(TEST_DIR)/main.c
 TEST_OBJ    = $(patsubst $(TEST_DIR)/%.c, $(OBJDIR)/test/%.o, $(TEST_SRC))
 
 # --- Eseguibili Finali ---
-EXEC_MAIN   = $(BINDIR)/main
-EXEC_WORKER = $(BINDIR)/worker
-EXEC_CLIENT = $(BINDIR)/client
-TEST_EXEC   = $(BINDIR)/test_dict_runner
+EXEC_MAIN     = $(BINDIR)/main
+EXEC_WORKER   = $(BINDIR)/worker
+EXEC_CLIENT   = $(BINDIR)/client
+EXEC_DISORDER = $(BINDIR)/disorder 
+TEST_EXEC     = $(BINDIR)/test_dict_runner
 
 # --- Flags ---
 BASE_FLAGS  = -Wall -Wextra -Wpedantic -D_GNU_SOURCE -I$(APP_DIR) -I$(LIB_DIR)
@@ -63,7 +66,7 @@ CFLAGS      = $(BASE_FLAGS) $(DEBUG_FLAGS)
 
 .PHONY: all clean rebuild production run-main run-worker run-client
 
-all: $(EXEC_MAIN) $(EXEC_WORKER) $(EXEC_CLIENT)
+all: $(EXEC_MAIN) $(EXEC_WORKER) $(EXEC_CLIENT) $(EXEC_DISORDER)
 	@echo "$(TAG_BUILD) Project compiled successfully."
 
 production: CFLAGS = $(BASE_FLAGS) $(PROD_FLAGS)
@@ -90,6 +93,11 @@ $(EXEC_CLIENT): $(OBJ_CLIENT) $(COMMON_OBJECTS) $(LIB_OBJECTS)
 	@echo "$(TAG_BUILD) Linking CLIENT (with common files)..."
 	@$(CC) $(CFLAGS) $^ -o $@
 
+$(EXEC_DISORDER): $(OBJ_DISORDER) $(COMMON_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(BINDIR)
+	@echo "$(TAG_BUILD) Linking DISORDER (with common files)..."
+	@$(CC) $(CFLAGS) $^ -o $@
+	
 # Link Test
 $(TEST_EXEC): $(TEST_OBJ) $(LIB_OBJECTS)
 	@mkdir -p $(BINDIR)
@@ -130,3 +138,6 @@ run-worker: $(EXEC_WORKER)
 
 run-client: $(EXEC_CLIENT)
 	@./$(EXEC_CLIENT)
+
+run-disorder: $(EXEC_DISORDER)
+	@./$(EXEC_DISORDER)

@@ -291,11 +291,13 @@ _serve_checkout(
     station *st,
     msg_t   *response
 ) {
+    sem_wait(st->sem);
+    
           size_t price    = response->price;
     const size_t discount = (price * DISCOUNT_DISH) / 100;
 
     price -= discount;
-    sem_wait(st->sem);
+    // sem_wait(st->sem);
     st->stats.earnings += price;
     sem_signal(st->sem);
     

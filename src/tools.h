@@ -250,6 +250,19 @@ zfopen(const char* fname, const char* mode) {
     return file;
 }
 
+static inline void
+zfscanf(
+          FILE *file,
+    const char *fmt,
+                ...
+) {
+    va_list args;
+    va_start(args, fmt);
+    
+    if (vfscanf(file, fmt, args) < 1)
+        panic("ERROR: Failed read values\n");
+}
+
 static inline long
 zfsize(FILE* file) {
     long fsize;

@@ -56,6 +56,9 @@ void      release_ctx(shmid_t, simctx_t*);
 station*  init_stations(simctx_t*, size_t);
 void      release_station(station);
 
+void      write_shared_data(shmid_t, shmid_t);
+void      reset_shared_data();
+
 void      release_clients(simctx_t*);
 
 void      kill_all_child(simctx_t*, station*);
@@ -72,28 +75,40 @@ render_dashboard(
 );
 
 int
-main(void) {
+main(int argc, char **argv) {
+
+    conf_t conf = {};
+    switch (argc) {
+    case 1:
+        load_config("data/default_config.json", &conf);
+        break;
+    case 2:
+        load_config(argv[1], &conf);
+        break;
+    default:
+        fprintf(stderr, "ERROR: Too many arguments provided.\n");
+        fprintf(stderr, "Usage: %s [config_file_path]\n", argv[0]);
+
+        fprintf(stderr, "Received command: ");
+        it(i, 0, argc) { fprintf(stderr, "%s ", argv[i]); }
+        fprintf(stderr, "\n");
+        return -1;
+    }
+
     /* ========================== INIT ========================== */
     signal(SIGUSR1, SIG_IGN);
     srand((unsigned int)time(NULL));
     screen* screen = init_scr();
 
-    // PICK THE CONFIG FILE FROM THE ARGV
-    conf_t conf = {};
-    load_config("data/config.json", &conf);
-
     const size_t ctx_shm  = zshmget(
         sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t))
     );
-
-    FILE *f = zfopen("data/shared", "w");
-    fprintf(f, "%zu", ctx_shm);
-    fclose(f);
-
     simctx_t* ctx = init_ctx(ctx_shm, conf);
 
     const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
           station*  stations = init_stations(ctx, st_shm);
+
+    write_shared_data(ctx_shm, st_shm);
 
     g_client_pids.id  = zcalloc(ctx->config.nof_users, sizeof(pid_t));
     g_client_pids.cnt = 0;
@@ -134,6 +149,8 @@ main(void) {
         usleep(100000);
     }
 
+    reset_shared_data();
+    
     it(i, 0, NOF_STATIONS)
         release_station(stations[i]);
 
@@ -559,7 +576,6 @@ init_ctx(
 
     ctx->sem[out]      = sem_init(1);
     ctx->sem[shm]      = sem_init(1);
-    ctx->sem[disorder] = sem_init(1);
     ctx->sem[wk_end]   = sem_init(0);
     ctx->sem[cl_end]   = sem_init(0);
     ctx->sem[wall]     = sem_init(0);
@@ -584,6 +600,9 @@ init_ctx(
         }
     }
 
+    ctx->is_disorder_active = false;
+    ctx->added_users        = 0;
+
     return ctx;
 }
 
@@ -601,6 +620,23 @@ release_ctx(
     shmdt(ctx);
 
     shm_kill(shmid);
+}
+
+void
+write_shared_data(
+    shmid_t ctx_shm,
+    shmid_t st_shm
+) {    
+    FILE *f = zfopen("data/shared", "w");
+    fprintf(f, "%zu %zu\n", ctx_shm, st_shm);
+    fclose(f);
+}
+
+void
+reset_shared_data() {
+    FILE *f = zfopen("data/shared", "w");
+    fprintf(f, "%d, %d\n", -1, -1);
+    fclose(f);
 }
 
 station*

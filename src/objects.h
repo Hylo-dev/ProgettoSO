@@ -117,6 +117,7 @@ typedef struct {
     int nof_users;
     int max_users_per_group;
     int nof_pause;
+    int pause_duration;
 
     // Tempi di servizio (AVG)
     int avg_srvc[NOF_STATIONS];
@@ -142,7 +143,7 @@ typedef struct {
     // primi;
     // secondi;
     int avg_refill_time;
-    int stop_duration;
+    int disorder_duration;
     int n_new_users;
 
 } conf_t;
@@ -171,7 +172,7 @@ typedef struct {
     bool is_day_running;
 
     bool   is_disorder_active;
-    size_t added_users;
+    size_t added_users; // TODO implement this shit
 
     struct groups_t {
         size_t id;

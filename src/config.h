@@ -77,6 +77,9 @@ load_config(
     PARSE_INT(json, "NOF_PAUSE",            nof_pause);
     assert(conf->nof_pause >= 0 && "NOF_PAUSE must be >= 0");
 
+    PARSE_INT(json, "PAUSE_DURATION",            pause_duration);
+    assert(conf->pause_duration >= 0 && "NOF_PAUSE must be >= 0");
+
     PARSE_INT(json, "AVG_SRVC_PRIMI",       avg_srvc[FIRST_COURSE]);
     assert(conf->avg_srvc[FIRST_COURSE] > 0 && "AVG_SRVC_PRIMI must be > 0");
 
@@ -121,8 +124,8 @@ load_config(
     PARSE_INT(json, "AVG_REFILL_TIME",      avg_refill_time);
     assert(conf->avg_refill_time > 0 && "AVG_REFILL_TIME must be > 0");
 
-    PARSE_INT(json, "STOP_DURATION",        stop_duration);
-    assert(conf->stop_duration >= 0 && "STOP_DURATION must be >= 0");
+    PARSE_INT(json, "DISORDER_DURATION",        disorder_duration);
+    assert(conf->disorder_duration >= 0 && "STOP_DURATION must be >= 0");
 
     PARSE_INT(json, "N_NEW_USERS",          n_new_users);
     assert(conf->n_new_users >= 0 && "N_NEW_USERS must be >= 0");

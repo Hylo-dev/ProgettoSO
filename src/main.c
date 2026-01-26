@@ -571,25 +571,7 @@ render_dashboard(
             s_draw_text(s, box_x + box_w + 2, box_y, COL_GRAY, "!ALERT!");
         }
     } else {
-        // *** STATO NORMALE - Scegli uno stile: ***
-        
-        // OPZIONE 1: Heartbeat / ECG style (battito cardiaco)
-        const char* pattern[] = {"─", "─", "╱", "█", "╲", "─", "─", "─", "╱", "╲", "─", "─"};
-        
-        // OPZIONE 2: Pulse dots (pulsazione con punti)
-        // const char* pattern[] = {"·", "∘", "○", "◉", "●", "◉", "○", "∘", "·", " ", " ", " "};
-        
-        // OPZIONE 3: Spinning bars (barre rotanti - stile caricamento)
-        // const char* pattern[] = {"│", "╱", "─", "╲", "│", "╱", "─", "╲"};
-        
-        // OPZIONE 4: Wave tilde (onde con tilde)
-        // const char* pattern[] = {"˜", "∼", "≈", "∿", "〜", "∼", "≈", "˜"};
-        
-        // OPZIONE 5: Star pulse (pulsazione stellare)
-        // const char* pattern[] = {"·", "∗", "✦", "✧", "★", "✧", "✦", "∗", "·", " "};
-
-        // OPZIONE 6
-        // const char* pattern[] = {"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"}
+        const char* pattern[] = {"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"};
 
         const int pattern_count = sizeof(pattern) / sizeof(pattern[0]);
         const int view_w = 16;

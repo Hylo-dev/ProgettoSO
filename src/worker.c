@@ -155,8 +155,8 @@ work_with_pause(
         st->stats.total_breaks++;
         sem_signal(ctx->sem[shm]);
 
-        self->pause_time += (size_t)ctx->config.stop_duration;
-        znsleep((size_t)ctx->config.stop_duration);
+        self->pause_time += (size_t)ctx->config.pause_duration;
+        znsleep((size_t)ctx->config.pause_duration);
     }
 }
 
@@ -291,8 +291,11 @@ _serve_checkout(
     station *st,
     msg_t   *response
 ) {
-    sem_wait(st->sem);
-    
+    if (sem_wait(st->sem) == -1) {
+        response->status = ERROR;
+        return;
+    }
+    // TODO FIX : during the disorter, at the start, the earings continue rising
           size_t price    = response->price;
     const size_t discount = (price * DISCOUNT_DISH) / 100;
 
@@ -324,12 +327,11 @@ serve_client(
     );
     znsleep(actual_time);
 
-    sem_wait(ctx->sem[shm]);
-
-    if (self->role != CHECKOUT)
-        _serve_food(ctx, self, st, response, actual_time);    
-    else
+    if (self->role != CHECKOUT) {
+        sem_wait(ctx->sem[shm]);
+        _serve_food(ctx, self, st, response, actual_time);
+        sem_signal(ctx->sem[shm]);
+    } else 
         _serve_checkout(st, response);
-
-    sem_signal(ctx->sem[shm]);
+    
 }

@@ -78,12 +78,18 @@ main(void) {
     srand((unsigned int)time(NULL));
     screen* screen = init_scr();
 
+    // PICK THE CONFIG FILE FROM THE ARGV
     conf_t conf = {};
     load_config("data/config.json", &conf);
 
     const size_t ctx_shm  = zshmget(
         sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t))
     );
+
+    FILE *f = zfopen("data/shared", "w");
+    fprintf(f, "%zu", ctx_shm);
+    fclose(f);
+
     simctx_t* ctx = init_ctx(ctx_shm, conf);
 
     const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
@@ -110,7 +116,7 @@ main(void) {
     ctx->is_sim_running = false; 
     ctx->is_day_running = false;
 
-    zprintf(ctx->sem.out, "MAIN: Fine sim\n");
+    zprintf(ctx->sem[out], "MAIN: Fine sim\n");
 
     while (true) {
         s_clear(screen);
@@ -136,7 +142,7 @@ main(void) {
     
     release_clients(ctx);
 
-    sem_set(ctx->sem.wall, ctx->config.nof_workers + ctx->config.nof_users);
+    sem_set(ctx->sem[wall], ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
     release_ctx(ctx_shm, ctx);
@@ -154,13 +160,13 @@ sim_day(
 ) {
     if (day > 0) assign_roles(ctx, stations);
 
-    zprintf(ctx->sem.out, "MAIN: Inizio giornata\n");
+    zprintf(ctx->sem[out], "MAIN: Inizio giornata\n");
     ctx->is_day_running = true;
 
     // Settato per la quantita di wk attivi
-    sem_set(ctx->sem.wall,   ctx->config.nof_workers + ctx->config.nof_users);
-    sem_set(ctx->sem.wk_end, ctx->config.nof_workers);
-    sem_set(ctx->sem.cl_end, ctx->config.nof_users  );
+    sem_set(ctx->sem[wall],   ctx->config.nof_workers + ctx->config.nof_users);
+    sem_set(ctx->sem[wk_end], ctx->config.nof_workers);
+    sem_set(ctx->sem[cl_end], ctx->config.nof_users  );
 
     size_t current_min = 0;
     
@@ -185,9 +191,9 @@ sim_day(
         
         if (current_min >= next_refill_min) {
             
-            zprintf(ctx->sem.out, "MAIN: Eseguo Refill al minuto %zu\n", current_min);
+            zprintf(ctx->sem[out], "MAIN: Eseguo Refill al minuto %zu\n", current_min);
 
-            sem_wait(ctx->sem.shm);
+            sem_wait(ctx->sem[shm]);
             it (loc_idx, 0, 2) {
                 dish_avl_t  *elem_avl = ctx->avl_dishes[loc_idx].data;
                 const size_t size_avl = ctx->avl_dishes[loc_idx].size;
@@ -200,7 +206,7 @@ sim_day(
                     if (*qty > max) *qty = max;
                 }
             }
-            sem_signal(ctx->sem.shm);
+            sem_signal(ctx->sem[shm]);
 
             size_t interval = get_service_time(
                 ctx->config.avg_refill_time,
@@ -210,16 +216,16 @@ sim_day(
         }
     }
     
-    zprintf(ctx->sem.out, "MAIN: Fine giornata\n");
+    zprintf(ctx->sem[out], "MAIN: Fine giornata\n");
 
-    int users_inside = ctx->config.nof_users - sem_getval(ctx->sem.cl_end);
+    int users_inside = ctx->config.nof_users - sem_getval(ctx->sem[cl_end]);
     
     if (users_inside > 0) {
         ctx->global_stats.users_not_served += users_inside;
     }
 
     if (users_inside >= ctx->config.overload_threshold) {
-        zprintf(ctx->sem.out, "MAIN: Sim end overload (Users left: %d)\n", users_inside);
+        zprintf(ctx->sem[out], "MAIN: Sim end overload (Users left: %d)\n", users_inside);
         ctx->is_sim_running = false;
     }
     
@@ -233,9 +239,9 @@ sim_day(
     ctx->is_day_running = false;
     kill_all_child(ctx, stations);
     
-    zprintf(ctx->sem.out, "MAIN: Reset day sem\n");
-    sem_wait_zero(ctx->sem.wk_end);
-    sem_wait_zero(ctx->sem.cl_end);
+    zprintf(ctx->sem[out], "MAIN: Reset day sem\n");
+    sem_wait_zero(ctx->sem[wk_end]);
+    sem_wait_zero(ctx->sem[cl_end]);
 }
 
 /* ========================== PROCESSES ========================== */ 
@@ -366,7 +372,7 @@ render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
 
     // Destra: Barra Utenti
     int u_total    = ctx->config.nof_users;
-    int u_finished = sem_getval(ctx->sem.cl_end);
+    int u_finished = sem_getval(ctx->sem[cl_end]);
     int u_inside   = u_total - u_finished;
     
     if (u_total > 0) {
@@ -395,7 +401,7 @@ render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
         tot_breaks += st[i].stats.total_breaks;
     }
     size_t tot_not_srv = ctx->global_stats.users_not_served;
-    size_t u_eating    = ctx->config.nof_tbl_seats - sem_getval(ctx->sem.tbl);
+    size_t u_eating    = ctx->config.nof_tbl_seats - sem_getval(ctx->sem[tbl]);
 
     int label_w = 18;
     s_draw_text(s, c1 + 2, r, COL_GRAY, "Serviti Totali:");
@@ -551,12 +557,13 @@ init_ctx(
         }
     }
 
-    ctx->sem.out    = sem_init(1);
-    ctx->sem.shm    = sem_init(1);
-    ctx->sem.wk_end = sem_init(0);
-    ctx->sem.cl_end = sem_init(0);
-    ctx->sem.wall   = sem_init(0);
-    ctx->sem.tbl    = sem_init(ctx->config.nof_tbl_seats);
+    ctx->sem[out]      = sem_init(1);
+    ctx->sem[shm]      = sem_init(1);
+    ctx->sem[disorder] = sem_init(1);
+    ctx->sem[wk_end]   = sem_init(0);
+    ctx->sem[cl_end]   = sem_init(0);
+    ctx->sem[wall]     = sem_init(0);
+    ctx->sem[tbl]      = sem_init(ctx->config.nof_tbl_seats);
 
     // Inizializziamo la lista
     g_priority_list[0] = FIRST_COURSE;
@@ -585,14 +592,9 @@ release_ctx(
     shmid_t   shmid,
     simctx_t* ctx
 ) {
-    sem_kill(ctx->sem.shm);
-    sem_kill(ctx->sem.out);
-    sem_kill(ctx->sem.tbl);
-    sem_kill(ctx->sem.wall);
-    sem_kill(ctx->sem.wk_end);
-    sem_kill(ctx->sem.cl_end);
+    it(i, 0, SEM_CNT) sem_kill(ctx->sem[i]);
 
-    it (i, 0, ctx->config.nof_users) sem_kill(ctx->groups[i].sem);
+    it(i, 0, ctx->config.nof_users) sem_kill(ctx->groups[i].sem);
 
     it(i, 0, NOF_STATIONS) msg_kill((int)ctx->id_msg_q[i]);
 

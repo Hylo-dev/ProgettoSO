@@ -71,10 +71,10 @@ main(
         const simctx_t  *ctx = get_ctx(shmid);
         struct groups_t *group = (struct groups_t*)&ctx->groups[grp_id];
         zprintf(
-            ctx->sem.out,
+            ctx->sem[out],
             "CLIENT: Waiting new day\n"
         );
-        sem_wait(ctx->sem.wall);
+        sem_wait(ctx->sem[wall]);
 
         if (!ctx->is_sim_running) break;
 
@@ -96,9 +96,9 @@ main(
         /* =============== BEGIN OF REQUEST LOOP ============== */
         send_request(ctx, &self, &response, &price, group);
 
-        sem_wait(ctx->sem.cl_end);
+        sem_wait(ctx->sem[cl_end]);
         if (!ctx->is_sim_running) {
-            zprintf(ctx->sem.out, "CLIENT %d: Giornata finita, esco.\n", getpid());
+            zprintf(ctx->sem[out], "CLIENT %d: Giornata finita, esco.\n", getpid());
             break;
         }
     }
@@ -162,16 +162,16 @@ send_request(
 
             case CHECKOUT:
                 if (collected == 0) {
-                    zprintf(ctx->sem.out, "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
+                    zprintf(ctx->sem[out], "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
 
-                    sem_wait(ctx->sem.shm);
+                    sem_wait(ctx->sem[shm]);
                     group->total_members--;
 
                     if (group->members_ready >= group->total_members && group->total_members > 0) {
                         sem_set(group->sem, (int)group->total_members - 1);
                     }
 
-                    sem_signal(ctx->sem.shm);
+                    sem_signal(ctx->sem[shm]);
                     return;
                 }
 
@@ -181,29 +181,29 @@ send_request(
 
             case TABLE:
                 zprintf(
-                    ctx->sem.out,
+                    ctx->sem[out],
                     "CLIENT: %d, %d, WAITING TABLE\n",
                     self->pid, self->loc
                 );
 
-                sem_wait(ctx->sem.shm);
+                sem_wait(ctx->sem[shm]);
                 group->members_ready++;
 
                 if (group->members_ready == group->total_members) {
                     sem_signal(group->sem);
-                    sem_signal(ctx->sem.shm);
+                    sem_signal(ctx->sem[shm]);
 
                 } else {
-                    sem_signal(ctx->sem.shm);
+                    sem_signal(ctx->sem[shm]);
                     sem_wait(group->sem);
                     sem_signal(group->sem);
                 }
 
                 // IMPORTANT: TODO: add clients groups support here
-                sem_wait(ctx->sem.tbl);
+                sem_wait(ctx->sem[tbl]);
 
                 zprintf(
-                    ctx->sem.out,
+                    ctx->sem[out],
                     "CLIENT %d: Found table, Eating for %zu ns\n",
                     self->pid,
                     self->wait_time
@@ -211,16 +211,16 @@ send_request(
                 znsleep(self->wait_time);
 
                 zprintf(
-                    ctx->sem.out,
+                    ctx->sem[out],
                     "CLIENT %d: Leaving table\n",
                     self->pid
                 );
-                sem_signal(ctx->sem.tbl);
+                sem_signal(ctx->sem[tbl]);
                 break;
 
             case EXIT:
                 zprintf(
-                    ctx->sem.out,
+                    ctx->sem[out],
                     "CLIENT: %d, EXIT\n",
                     self->pid
                 );
@@ -291,7 +291,7 @@ ask_dish(
         
         send_msg(self->msgq, *msg, sizeof(msg_t) - sizeof(long));
 
-        zprintf(ctx->sem.out, "CLIENT %d: Chiede piatto %zu a Stazione %d\n", 
+        zprintf(ctx->sem[out], "CLIENT %d: Chiede piatto %zu a Stazione %d\n", 
                 self->pid, msg->dish.id, self->loc);
 
         int res = recive_msg(self->msgq, self->pid, response);
@@ -300,19 +300,19 @@ ask_dish(
         }
 
         if (response->status == RESPONSE_OK) {
-            zprintf(ctx->sem.out, "CLIENT %d: Ottenuto piatto %zu\n", self->pid, response->dish.id);
+            zprintf(ctx->sem[out], "CLIENT %d: Ottenuto piatto %zu\n", self->pid, response->dish.id);
             return true;
         }
 
         // CASO 2: Tutta la categoria è finita
         if (response->status == RESPONSE_CATEGORY_FINISHED) {
-            zprintf(ctx->sem.out, "CLIENT %d: Stazione %d vuota, salto portata.\n", self->pid, self->loc);
+            zprintf(ctx->sem[out], "CLIENT %d: Stazione %d vuota, salto portata.\n", self->pid, self->loc);
             return false;
         }
 
         // CASO 3: Piatto specifico finito, ma ce ne sono altri [cite: 133]
         if (response->status == RESPONSE_DISH_FINISHED) {
-            zprintf(ctx->sem.out, "CLIENT %d: Piatto %zu finito, cerco alternativa...\n", self->pid, msg->dish.id);
+            zprintf(ctx->sem[out], "CLIENT %d: Piatto %zu finito, cerco alternativa...\n", self->pid, msg->dish.id);
             
             ssize_t new_id = -1;
             const size_t menu_size = ctx->menu[self->loc].size;
@@ -337,7 +337,7 @@ ask_dish(
             }
 
             if (new_id == -1) {
-                zprintf(ctx->sem.out, "CLIENT %d: Provati tutti i piatti di %d, rinuncio.\n", self->pid, self->loc);
+                zprintf(ctx->sem[out], "CLIENT %d: Provati tutti i piatti di %d, rinuncio.\n", self->pid, self->loc);
                 return false;
             }
 

@@ -1,0 +1,975 @@
+CLIENT 10248: Giornata finita, esco.
+CLIENT 10251: Giornata finita, esco.
+CLIENT 10259: Giornata finita, esco.
+CLIENT 10243: Giornata finita, esco.
+CLIENT 10276: Giornata finita, esco.
+CLIENT 10309: Giornata finita, esco.
+CLIENT 10311: Giornata finita, esco.
+CLIENT 10321: Giornata finita, esco.
+CLIENT 10283: Giornata finita, esco.
+CLIENT 10282: Giornata finita, esco.
+CLIENT 10280: Giornata finita, esco.
+CLIENT 10281: Giornata finita, esco.
+CLIENT 10285: Giornata finita, esco.
+CLIENT 10286: Giornata finita, esco.
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+MAIN: Inizio giornata
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+WORKER: WAITING INIT DAY
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT 10540: Chiede piatto 0 a Stazione 0
+CLIENT 10551: Chiede piatto 0 a Stazione 0
+CLIENT 10550: Chiede piatto 0 a Stazione 0
+CLIENT 10572: Chiede piatto 0 a Stazione 0
+CLIENT 10552: Chiede piatto 0 a Stazione 0
+CLIENT 10547: Chiede piatto 0 a Stazione 0
+CLIENT 10555: Chiede piatto 0 a Stazione 0
+CLIENT 10538: Chiede piatto 0 a Stazione 0
+CLIENT 10571: Chiede piatto 0 a Stazione 0
+CLIENT 10565: Chiede piatto 0 a Stazione 0
+CLIENT 10544: Chiede piatto 0 a Stazione 0
+CLIENT 10558: Chiede piatto 0 a Stazione 0
+CLIENT 10628: Chiede piatto 0 a Stazione 0
+CLIENT 10541: Chiede piatto 0 a Stazione 0
+CLIENT 10568: Chiede piatto 0 a Stazione 0
+CLIENT 10539: Chiede piatto 0 a Stazione 0
+CLIENT 10589: Chiede piatto 0 a Stazione 0
+CLIENT 10619: Chiede piatto 0 a Stazione 0
+CLIENT 10598: Chiede piatto 0 a Stazione 0
+CLIENT 10566: Chiede piatto 0 a Stazione 0
+CLIENT 10546: Chiede piatto 0 a Stazione 0
+CLIENT 10603: Chiede piatto 0 a Stazione 0
+CLIENT 10610: Chiede piatto 0 a Stazione 0
+CLIENT 10577: Chiede piatto 0 a Stazione 0
+CLIENT 10631: Chiede piatto 0 a Stazione 0
+CLIENT 10553: Chiede piatto 0 a Stazione 0
+CLIENT 10617: Chiede piatto 0 a Stazione 0
+CLIENT 10545: Chiede piatto 0 a Stazione 0
+CLIENT 10629: Chiede piatto 0 a Stazione 0
+CLIENT 10620: Chiede piatto 0 a Stazione 0
+CLIENT 10563: Chiede piatto 0 a Stazione 0
+CLIENT 10588: Chiede piatto 0 a Stazione 0
+CLIENT 10595: Chiede piatto 0 a Stazione 0
+CLIENT 10559: Chiede piatto 0 a Stazione 0
+CLIENT 10585: Chiede piatto 0 a Stazione 0
+CLIENT 10582: Chiede piatto 0 a Stazione 0
+CLIENT 10597: Chiede piatto 0 a Stazione 0
+CLIENT 10605: Chiede piatto 0 a Stazione 0
+CLIENT 10607: Chiede piatto 0 a Stazione 0
+CLIENT 10557: Chiede piatto 0 a Stazione 0
+CLIENT 10606: Chiede piatto 0 a Stazione 0
+CLIENT 10560: Chiede piatto 0 a Stazione 0
+CLIENT 10554: Chiede piatto 0 a Stazione 0
+CLIENT 10543: Chiede piatto 0 a Stazione 0
+CLIENT 10614: Chiede piatto 0 a Stazione 0
+CLIENT 10567: Chiede piatto 0 a Stazione 0
+CLIENT 10556: Chiede piatto 0 a Stazione 0
+CLIENT 10569: Chiede piatto 0 a Stazione 0
+CLIENT 10561: Chiede piatto 0 a Stazione 0
+CLIENT 10548: Chiede piatto 0 a Stazione 0
+CLIENT 10584: Chiede piatto 0 a Stazione 0
+CLIENT 10562: Chiede piatto 0 a Stazione 0
+CLIENT 10583: Chiede piatto 0 a Stazione 0
+CLIENT 10593: Chiede piatto 0 a Stazione 0
+CLIENT 10579: Chiede piatto 0 a Stazione 0
+CLIENT 10592: Chiede piatto 0 a Stazione 0
+CLIENT 10581: Chiede piatto 0 a Stazione 0
+CLIENT 10575: Chiede piatto 0 a Stazione 0
+CLIENT 10574: Chiede piatto 0 a Stazione 0
+CLIENT 10549: Chiede piatto 0 a Stazione 0
+CLIENT 10586: Chiede piatto 0 a Stazione 0
+CLIENT 10587: Chiede piatto 0 a Stazione 0
+CLIENT 10570: Chiede piatto 0 a Stazione 0
+CLIENT 10621: Chiede piatto 0 a Stazione 0
+CLIENT 10564: Chiede piatto 0 a Stazione 0
+CLIENT 10578: Chiede piatto 0 a Stazione 0
+CLIENT 10542: Chiede piatto 0 a Stazione 0
+CLIENT 10591: Chiede piatto 0 a Stazione 0
+WORKER: id 10648, role 1, WAITING
+WORKER: id 10641, role 0, WAITING
+WORKER: id 10647, role 1, WAITING
+WORKER: id 10644, role 0, WAITING
+WORKER: id 10642, role 0, WAITING
+WORKER: id 10646, role 1, WAITING
+WORKER: id 10639, role 0, WAITING
+WORKER: id 10653, role 1, WAITING
+CLIENT 10573: Chiede piatto 0 a Stazione 0
+WORKER: id 10649, role 1, WAITING
+WORKER: id 10640, role 0, WAITING
+CLIENT 10590: Chiede piatto 0 a Stazione 0
+CLIENT 10627: Chiede piatto 0 a Stazione 0
+WORKER: id 10652, role 1, WAITING
+CLIENT 10618: Chiede piatto 0 a Stazione 0
+CLIENT 10604: Chiede piatto 0 a Stazione 0
+CLIENT 10612: Chiede piatto 0 a Stazione 0
+WORKER: id 10638, role 0, WAITING
+WORKER: id 10643, role 0, WAITING
+WORKER: id 10663, role 3, WAITING
+WORKER: id 10661, role 2, WAITING
+WORKER: id 10658, role 2, WAITING
+WORKER: id 10659, role 2, WAITING
+CLIENT 10580: Chiede piatto 0 a Stazione 0
+WORKER: id 10656, role 1, WAITING
+CLIENT 10613: Chiede piatto 0 a Stazione 0
+WORKER: id 10645, role 0, WAITING
+WORKER: id 10655, role 1, WAITING
+WORKER: id 10662, role 3, WAITING
+WORKER: id 10660, role 2, WAITING
+WORKER: id 10651, role 1, WAITING
+CLIENT 10600: Chiede piatto 0 a Stazione 0
+WORKER: id 10667, role 3, WAITING
+CLIENT 10576: Chiede piatto 0 a Stazione 0
+WORKER: id 10657, role 1, WAITING
+WORKER: id 10666, role 3, WAITING
+WORKER: id 10654, role 1, WAITING
+CLIENT 10602: Chiede piatto 0 a Stazione 0
+CLIENT 10596: Chiede piatto 0 a Stazione 0
+CLIENT 10599: Chiede piatto 0 a Stazione 0
+CLIENT 10616: Chiede piatto 0 a Stazione 0
+WORKER: id 10664, role 3, WAITING
+WORKER: id 10650, role 1, WAITING
+WORKER: id 10665, role 3, WAITING
+CLIENT 10615: Chiede piatto 0 a Stazione 0
+CLIENT 10622: Chiede piatto 0 a Stazione 0
+CLIENT 10594: Chiede piatto 0 a Stazione 0
+CLIENT 10608: Chiede piatto 0 a Stazione 0
+CLIENT 10601: Chiede piatto 0 a Stazione 0
+CLIENT 10623: Chiede piatto 0 a Stazione 0
+CLIENT 10609: Chiede piatto 0 a Stazione 0
+CLIENT 10636: Chiede piatto 0 a Stazione 0
+CLIENT 10633: Chiede piatto 0 a Stazione 0
+CLIENT 10630: Chiede piatto 0 a Stazione 0
+CLIENT 10632: Chiede piatto 0 a Stazione 0
+CLIENT 10635: Chiede piatto 0 a Stazione 0
+CLIENT 10625: Chiede piatto 0 a Stazione 0
+CLIENT 10624: Chiede piatto 0 a Stazione 0
+CLIENT 10634: Chiede piatto 0 a Stazione 0
+CLIENT 10626: Chiede piatto 0 a Stazione 0
+CLIENT 10637: Chiede piatto 0 a Stazione 0
+CLIENT 10611: Chiede piatto 0 a Stazione 0
+WORKER 10641: Service time 9 ns
+WORKER 10644: Service time 9 ns
+WORKER 10642: Service time 9 ns
+WORKER 10641: Service time 9 ns
+CLIENT 10540: Ottenuto piatto 0
+WORKER 10642: Service time 9 ns
+CLIENT 10550: Ottenuto piatto 0
+WORKER 10644: Service time 9 ns
+CLIENT 10551: Ottenuto piatto 0
+WORKER 10648: Service time 9 ns
+CLIENT 10540: Chiede piatto 0 a Stazione 1
+CLIENT 10550: Chiede piatto 0 a Stazione 1
+WORKER 10647: Service time 9 ns
+CLIENT 10551: Chiede piatto 0 a Stazione 1
+WORKER 10646: Service time 9 ns
+WORKER 10642: Service time 14 ns
+CLIENT 10552: Ottenuto piatto 0
+WORKER 10641: Service time 14 ns
+WORKER 10644: Service time 14 ns
+CLIENT 10572: Ottenuto piatto 0
+CLIENT 10547: Ottenuto piatto 0
+CLIENT 10540: Ottenuto piatto 0
+CLIENT 10551: Ottenuto piatto 0
+CLIENT 10550: Ottenuto piatto 0
+CLIENT 10552: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 10 ns
+CLIENT 10572: Chiede piatto 0 a Stazione 1
+WORKER 10646: Service time 10 ns
+CLIENT 10547: Chiede piatto 0 a Stazione 1
+WORKER 10647: Service time 10 ns
+CLIENT 10540: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 8 ns
+CLIENT 10551: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 8 ns
+CLIENT 10550: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 9 ns
+CLIENT 10540: Ottenuto piatto 1
+CLIENT 10551: Ottenuto piatto 1
+WORKER 10663: Service time 8 ns
+WORKER 10662: Service time 8 ns
+CLIENT 10552: Ottenuto piatto 0
+CLIENT 10572: Ottenuto piatto 0
+CLIENT 10547: Ottenuto piatto 0
+CLIENT 10552: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 9 ns
+CLIENT 10572: Chiede piatto 1 a Stazione 2
+CLIENT 10547: Chiede piatto 1 a Stazione 2
+WORKER 10641: Service time 15 ns
+WORKER 10642: Service time 15 ns
+WORKER 10644: Service time 15 ns
+CLIENT 10538: Ottenuto piatto 0
+CLIENT 10555: Ottenuto piatto 0
+CLIENT 10571: Ottenuto piatto 0
+CLIENT 10538: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 14 ns
+CLIENT 10555: Chiede piatto 0 a Stazione 1
+WORKER 10646: Service time 14 ns
+CLIENT 10571: Chiede piatto 0 a Stazione 1
+WORKER 10647: Service time 14 ns
+CLIENT: 10540, 4, WAITING TABLE
+CLIENT: 10551, 4, WAITING TABLE
+WORKER 10661: Service time 4 ns
+CLIENT 10550: Ottenuto piatto 1
+WORKER 10663: Service time 9 ns
+CLIENT 10552: Ottenuto piatto 1
+WORKER 10658: Service time 4 ns
+WORKER 10662: Service time 9 ns
+CLIENT 10572: Ottenuto piatto 1
+CLIENT 10547: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT: 10550, 4, WAITING TABLE
+CLIENT 10538: Ottenuto piatto 0
+CLIENT 10538: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 8 ns
+CLIENT 10555: Ottenuto piatto 0
+CLIENT 10571: Ottenuto piatto 0
+CLIENT 10555: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 8 ns
+CLIENT 10571: Chiede piatto 1 a Stazione 2
+WORKER 10662: Service time 7 ns
+WORKER 10641: Service time 12 ns
+CLIENT: 10552, 4, WAITING TABLE
+CLIENT 10565: Ottenuto piatto 0
+WORKER 10644: Service time 12 ns
+WORKER 10642: Service time 12 ns
+CLIENT 10558: Ottenuto piatto 0
+CLIENT 10544: Ottenuto piatto 0
+CLIENT 10565: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 21 ns
+CLIENT 10558: Chiede piatto 0 a Stazione 1
+WORKER 10646: Service time 21 ns
+CLIENT 10544: Chiede piatto 0 a Stazione 1
+WORKER 10647: Service time 21 ns
+CLIENT: 10572, 4, WAITING TABLE
+CLIENT: 10547, 4, WAITING TABLE
+WORKER 10661: Service time 3 ns
+CLIENT 10538: Ottenuto piatto 1
+WORKER 10663: Service time 8 ns
+CLIENT 10555: Ottenuto piatto 1
+WORKER 10662: Service time 8 ns
+CLIENT 10571: Ottenuto piatto 1
+WORKER 10641: Service time 7 ns
+CLIENT 10628: Ottenuto piatto 0
+WORKER 10644: Service time 7 ns
+CLIENT 10541: Ottenuto piatto 0
+WORKER 10642: Service time 7 ns
+CLIENT 10568: Ottenuto piatto 0
+CLIENT 10628: Chiede piatto 0 a Stazione 1
+CLIENT 10541: Chiede piatto 0 a Stazione 1
+CLIENT 10568: Chiede piatto 0 a Stazione 1
+WORKER 10663: Service time 9 ns
+CLIENT: 10538, 4, WAITING TABLE
+CLIENT: 10555, 4, WAITING TABLE
+WORKER 10641: Service time 10 ns
+CLIENT 10539: Ottenuto piatto 0
+WORKER 10642: Service time 10 ns
+CLIENT 10619: Ottenuto piatto 0
+WORKER 10644: Service time 10 ns
+CLIENT 10589: Ottenuto piatto 0
+CLIENT 10539: Chiede piatto 0 a Stazione 1
+CLIENT 10619: Chiede piatto 0 a Stazione 1
+CLIENT 10589: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 13 ns
+CLIENT 10565: Ottenuto piatto 0
+WORKER 10646: Service time 13 ns
+CLIENT 10558: Ottenuto piatto 0
+CLIENT 10565: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 3 ns
+WORKER 10647: Service time 13 ns
+CLIENT 10544: Ottenuto piatto 0
+CLIENT 10558: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 4 ns
+CLIENT 10544: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 4 ns
+CLIENT 10565: Ottenuto piatto 1
+WORKER 10662: Service time 9 ns
+CLIENT: 10571, 4, WAITING TABLE
+MAIN: Eseguo Refill al minuto 65
+CLIENT 10558: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT 10544: Ottenuto piatto 1
+WORKER 10641: Service time 8 ns
+WORKER 10642: Service time 8 ns
+CLIENT 10598: Ottenuto piatto 0
+CLIENT 10566: Ottenuto piatto 0
+WORKER 10644: Service time 8 ns
+CLIENT 10546: Ottenuto piatto 0
+CLIENT 10598: Chiede piatto 0 a Stazione 1
+CLIENT 10566: Chiede piatto 0 a Stazione 1
+CLIENT 10546: Chiede piatto 0 a Stazione 1
+WORKER 10663: Service time 7 ns
+CLIENT: 10558, 4, WAITING TABLE
+CLIENT: 10565, 4, WAITING TABLE
+WORKER 10648: Service time 20 ns
+WORKER 10646: Service time 20 ns
+CLIENT 10628: Ottenuto piatto 0
+CLIENT 10541: Ottenuto piatto 0
+WORKER 10647: Service time 20 ns
+CLIENT 10568: Ottenuto piatto 0
+CLIENT 10628: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 4 ns
+CLIENT 10541: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 4 ns
+CLIENT 10568: Chiede piatto 1 a Stazione 2
+WORKER 10641: Service time 6 ns
+CLIENT 10603: Ottenuto piatto 0
+WORKER 10642: Service time 6 ns
+CLIENT 10610: Ottenuto piatto 0
+CLIENT 10603: Chiede piatto 0 a Stazione 1
+WORKER 10644: Service time 6 ns
+CLIENT 10577: Ottenuto piatto 0
+CLIENT 10610: Chiede piatto 0 a Stazione 1
+CLIENT 10577: Chiede piatto 0 a Stazione 1
+WORKER 10661: Service time 4 ns
+CLIENT 10628: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+CLIENT 10541: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT: 10544, 4, WAITING TABLE
+CLIENT 10568: Ottenuto piatto 1
+WORKER 10641: Service time 13 ns
+WORKER 10642: Service time 13 ns
+CLIENT 10631: Ottenuto piatto 0
+CLIENT 10553: Ottenuto piatto 0
+WORKER 10644: Service time 13 ns
+CLIENT 10617: Ottenuto piatto 0
+CLIENT 10631: Chiede piatto 0 a Stazione 1
+CLIENT 10553: Chiede piatto 0 a Stazione 1
+CLIENT 10617: Chiede piatto 0 a Stazione 1
+WORKER 10662: Service time 7 ns
+CLIENT: 10628, 4, WAITING TABLE
+CLIENT: 10541, 4, WAITING TABLE
+CLIENT: 10568, 4, WAITING TABLE
+WORKER 10648: Service time 17 ns
+CLIENT 10539: Ottenuto piatto 0
+WORKER 10646: Service time 17 ns
+CLIENT 10539: Chiede piatto 1 a Stazione 2
+CLIENT 10619: Ottenuto piatto 0
+WORKER 10658: Service time 4 ns
+CLIENT 10619: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 3 ns
+WORKER 10647: Service time 17 ns
+CLIENT 10589: Ottenuto piatto 0
+CLIENT 10589: Chiede piatto 1 a Stazione 2
+WORKER 10641: Service time 5 ns
+WORKER 10642: Service time 5 ns
+CLIENT 10545: Ottenuto piatto 0
+CLIENT 10629: Ottenuto piatto 0
+WORKER 10644: Service time 5 ns
+CLIENT 10620: Ottenuto piatto 0
+CLIENT 10545: Chiede piatto 0 a Stazione 1
+CLIENT 10629: Chiede piatto 0 a Stazione 1
+CLIENT 10620: Chiede piatto 0 a Stazione 1
+WORKER 10661: Service time 2 ns
+CLIENT 10619: Ottenuto piatto 1
+WORKER 10663: Service time 9 ns
+CLIENT 10539: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+CLIENT 10589: Ottenuto piatto 1
+WORKER 10641: Service time 10 ns
+WORKER 10642: Service time 10 ns
+CLIENT 10588: Ottenuto piatto 0
+CLIENT 10563: Ottenuto piatto 0
+WORKER 10644: Service time 10 ns
+CLIENT 10559: Ottenuto piatto 0
+CLIENT 10588: Chiede piatto 0 a Stazione 1
+CLIENT 10563: Chiede piatto 0 a Stazione 1
+CLIENT 10559: Chiede piatto 0 a Stazione 1
+WORKER 10662: Service time 9 ns
+CLIENT: 10539, 4, WAITING TABLE
+CLIENT 10539: Found table, Eating for 34 ns
+CLIENT 10540: Found table, Eating for 34 ns
+CLIENT 10538: Found table, Eating for 34 ns
+CLIENT: 10619, 4, WAITING TABLE
+WORKER 10648: Service time 14 ns
+CLIENT 10598: Ottenuto piatto 0
+WORKER 10646: Service time 14 ns
+CLIENT 10566: Ottenuto piatto 0
+CLIENT 10598: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 3 ns
+CLIENT 10566: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 1 ns
+WORKER 10647: Service time 14 ns
+CLIENT 10546: Ottenuto piatto 0
+CLIENT 10546: Chiede piatto 1 a Stazione 2
+WORKER 10641: Service time 11 ns
+CLIENT 10595: Ottenuto piatto 0
+CLIENT 10595: Chiede piatto 0 a Stazione 1
+WORKER 10644: Service time 11 ns
+CLIENT 10582: Ottenuto piatto 0
+WORKER 10642: Service time 11 ns
+CLIENT 10585: Ottenuto piatto 0
+CLIENT 10582: Chiede piatto 0 a Stazione 1
+CLIENT 10585: Chiede piatto 0 a Stazione 1
+WORKER 10661: Service time 3 ns
+CLIENT 10566: Ottenuto piatto 1
+WORKER 10663: Service time 8 ns
+CLIENT 10598: Ottenuto piatto 1
+WORKER 10662: Service time 8 ns
+CLIENT: 10589, 4, WAITING TABLE
+CLIENT 10546: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT: 10566, 4, WAITING TABLE
+CLIENT 10566: Found table, Eating for 34 ns
+CLIENT: 10598, 4, WAITING TABLE
+WORKER 10641: Service time 15 ns
+CLIENT 10597: Ottenuto piatto 0
+WORKER 10644: Service time 15 ns
+CLIENT 10605: Ottenuto piatto 0
+CLIENT 10597: Chiede piatto 0 a Stazione 1
+WORKER 10642: Service time 15 ns
+CLIENT 10557: Ottenuto piatto 0
+CLIENT 10605: Chiede piatto 0 a Stazione 1
+CLIENT 10557: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 22 ns
+WORKER 10646: Service time 22 ns
+CLIENT 10603: Ottenuto piatto 0
+CLIENT 10610: Ottenuto piatto 0
+WORKER 10647: Service time 22 ns
+CLIENT 10577: Ottenuto piatto 0
+CLIENT 10603: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 2 ns
+CLIENT 10610: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 1 ns
+CLIENT 10577: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 1 ns
+CLIENT 10610: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+CLIENT 10603: Ottenuto piatto 1
+WORKER 10663: Service time 9 ns
+CLIENT 10577: Ottenuto piatto 1
+CLIENT: 10546, 4, WAITING TABLE
+WORKER 10662: Service time 9 ns
+CLIENT: 10610, 4, WAITING TABLE
+MAIN: Eseguo Refill al minuto 126
+CLIENT: 10603, 4, WAITING TABLE
+WORKER 10641: Service time 12 ns
+CLIENT 10607: Ottenuto piatto 0
+WORKER 10644: Service time 12 ns
+CLIENT 10606: Ottenuto piatto 0
+CLIENT 10607: Chiede piatto 0 a Stazione 1
+WORKER 10642: Service time 12 ns
+CLIENT 10560: Ottenuto piatto 0
+CLIENT 10606: Chiede piatto 0 a Stazione 1
+CLIENT 10560: Chiede piatto 0 a Stazione 1
+CLIENT 10540: Leaving table
+CLIENT 10539: Leaving table
+CLIENT 10538: Leaving table
+CLIENT: 10540, EXIT
+CLIENT: 10539, EXIT
+CLIENT: 10538, EXIT
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: 10577, 4, WAITING TABLE
+WORKER 10648: Service time 15 ns
+WORKER 10646: Service time 15 ns
+WORKER 10647: Service time 15 ns
+CLIENT 10631: Ottenuto piatto 0
+CLIENT 10553: Ottenuto piatto 0
+CLIENT 10617: Ottenuto piatto 0
+CLIENT 10631: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 1 ns
+WORKER 10661: Service time 8 ns
+CLIENT 10553: Chiede piatto 1 a Stazione 2
+CLIENT 10617: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 3 ns
+CLIENT 10631: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+WORKER 10641: Service time 5 ns
+CLIENT 10554: Ottenuto piatto 0
+WORKER 10644: Service time 5 ns
+CLIENT 10543: Ottenuto piatto 0
+CLIENT 10554: Chiede piatto 0 a Stazione 1
+WORKER 10642: Service time 5 ns
+CLIENT 10614: Ottenuto piatto 0
+CLIENT 10543: Chiede piatto 0 a Stazione 1
+CLIENT 10614: Chiede piatto 0 a Stazione 1
+CLIENT 10617: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+CLIENT 10566: Leaving table
+CLIENT: 10566, EXIT
+CLIENT: Waiting new day
+WORKER 10641: Vado in pausa (Pausa n.1/3)
+CLIENT 10567: Ottenuto piatto 0
+CLIENT 10556: Ottenuto piatto 0
+WORKER 10644: Vado in pausa (Pausa n.1/3)
+WORKER 10639: Service time 9 ns
+CLIENT 10567: Chiede piatto 0 a Stazione 1
+CLIENT 10556: Chiede piatto 0 a Stazione 1
+CLIENT 10569: Ottenuto piatto 0
+WORKER 10642: Vado in pausa (Pausa n.1/3)
+WORKER 10640: Service time 9 ns
+CLIENT 10569: Chiede piatto 0 a Stazione 1
+WORKER 10638: Service time 9 ns
+CLIENT 10553: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT: 10631, 4, WAITING TABLE
+CLIENT: 10617, 4, WAITING TABLE
+WORKER 10648: Service time 11 ns
+CLIENT 10545: Ottenuto piatto 0
+WORKER 10646: Service time 11 ns
+WORKER 10647: Service time 11 ns
+CLIENT 10629: Ottenuto piatto 0
+CLIENT 10620: Ottenuto piatto 0
+CLIENT 10545: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 1 ns
+CLIENT 10629: Chiede piatto 1 a Stazione 2
+WORKER 10661: Service time 4 ns
+CLIENT 10620: Chiede piatto 1 a Stazione 2
+CLIENT: 10553, 4, WAITING TABLE
+WORKER 10658: Service time 1 ns
+CLIENT 10545: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+WORKER 10639: Service time 9 ns
+CLIENT 10561: Ottenuto piatto 0
+CLIENT 10561: Chiede piatto 0 a Stazione 1
+WORKER 10640: Service time 9 ns
+CLIENT 10548: Ottenuto piatto 0
+CLIENT 10548: Chiede piatto 0 a Stazione 1
+WORKER 10638: Service time 9 ns
+CLIENT 10584: Ottenuto piatto 0
+CLIENT 10584: Chiede piatto 0 a Stazione 1
+CLIENT 10620: Ottenuto piatto 1
+WORKER 10663: Service time 8 ns
+WORKER 10661: Vado in pausa (Pausa n.1/3)
+CLIENT 10629: Ottenuto piatto 1
+WORKER 10662: Service time 8 ns
+CLIENT: 10545, 4, WAITING TABLE
+CLIENT 10545: Found table, Eating for 34 ns
+CLIENT 10547: Found table, Eating for 34 ns
+CLIENT 10544: Found table, Eating for 34 ns
+CLIENT 10546: Found table, Eating for 34 ns
+CLIENT: 10620, 4, WAITING TABLE
+WORKER 10648: Service time 10 ns
+CLIENT 10588: Ottenuto piatto 0
+WORKER 10646: Service time 10 ns
+WORKER 10647: Service time 10 ns
+CLIENT 10563: Ottenuto piatto 0
+CLIENT 10559: Ottenuto piatto 0
+WORKER 10639: Service time 14 ns
+CLIENT 10562: Ottenuto piatto 0
+CLIENT 10588: Chiede piatto 1 a Stazione 2
+WORKER 10658: Service time 8 ns
+WORKER 10640: Service time 14 ns
+CLIENT 10583: Ottenuto piatto 0
+CLIENT 10563: Chiede piatto 1 a Stazione 2
+WORKER 10659: Service time 8 ns
+WORKER 10638: Service time 14 ns
+CLIENT 10593: Ottenuto piatto 0
+CLIENT 10559: Chiede piatto 1 a Stazione 2
+CLIENT 10562: Chiede piatto 0 a Stazione 1
+CLIENT 10583: Chiede piatto 0 a Stazione 1
+CLIENT 10593: Chiede piatto 0 a Stazione 1
+CLIENT: 10629, 4, WAITING TABLE
+CLIENT 10629: Found table, Eating for 34 ns
+CLIENT 10628: Found table, Eating for 34 ns
+WORKER 10658: Service time 4 ns
+CLIENT 10588: Ottenuto piatto 1
+WORKER 10663: Service time 7 ns
+CLIENT 10563: Ottenuto piatto 1
+WORKER 10662: Service time 7 ns
+WORKER 10648: Service time 20 ns
+CLIENT 10595: Ottenuto piatto 0
+WORKER 10646: Service time 20 ns
+CLIENT 10582: Ottenuto piatto 0
+CLIENT 10595: Chiede piatto 1 a Stazione 2
+WORKER 10659: Service time 9 ns
+WORKER 10647: Service time 20 ns
+CLIENT 10585: Ottenuto piatto 0
+CLIENT 10582: Chiede piatto 1 a Stazione 2
+CLIENT 10585: Chiede piatto 1 a Stazione 2
+WORKER: id 10641, role 0, WAITING
+WORKER: id 10644, role 0, WAITING
+WORKER: id 10642, role 0, WAITING
+WORKER 10658: Vado in pausa (Pausa n.1/3)
+CLIENT 10559: Ottenuto piatto 1
+WORKER 10660: Service time 8 ns
+WORKER 10639: Service time 15 ns
+WORKER 10640: Service time 15 ns
+CLIENT 10579: Ottenuto piatto 0
+CLIENT 10592: Ottenuto piatto 0
+WORKER 10638: Service time 15 ns
+CLIENT 10581: Ottenuto piatto 0
+CLIENT 10579: Chiede piatto 0 a Stazione 1
+CLIENT 10592: Chiede piatto 0 a Stazione 1
+CLIENT 10581: Chiede piatto 0 a Stazione 1
+WORKER 10663: Vado in pausa (Pausa n.1/3)
+CLIENT: 10588, 4, WAITING TABLE
+WORKER 10667: Service time 8 ns
+WORKER 10662: Vado in pausa (Pausa n.1/3)
+CLIENT: 10563, 4, WAITING TABLE
+WORKER 10659: Service time 4 ns
+CLIENT 10595: Ottenuto piatto 1
+WORKER 10666: Service time 8 ns
+CLIENT 10582: Ottenuto piatto 1
+WORKER: id 10661, role 2, WAITING
+CLIENT 10585: Ottenuto piatto 1
+WORKER 10667: Service time 9 ns
+CLIENT: 10559, 4, WAITING TABLE
+WORKER 10666: Service time 9 ns
+CLIENT: 10595, 4, WAITING TABLE
+WORKER 10639: Service time 12 ns
+WORKER 10640: Service time 12 ns
+CLIENT 10575: Ottenuto piatto 0
+CLIENT 10574: Ottenuto piatto 0
+WORKER 10638: Service time 12 ns
+CLIENT 10549: Ottenuto piatto 0
+CLIENT 10575: Chiede piatto 0 a Stazione 1
+CLIENT 10574: Chiede piatto 0 a Stazione 1
+CLIENT 10549: Chiede piatto 0 a Stazione 1
+WORKER 10648: Service time 20 ns
+CLIENT 10597: Ottenuto piatto 0
+CLIENT 10597: Chiede piatto 1 a Stazione 2
+WORKER 10660: Service time 9 ns
+WORKER 10646: Service time 20 ns
+CLIENT 10605: Ottenuto piatto 0
+CLIENT 10605: Chiede piatto 1 a Stazione 2
+WORKER 10659: Service time 8 ns
+WORKER 10647: Service time 20 ns
+CLIENT 10557: Ottenuto piatto 0
+CLIENT 10557: Chiede piatto 1 a Stazione 2
+CLIENT 10547: Leaving table
+CLIENT 10544: Leaving table
+CLIENT 10545: Leaving table
+CLIENT 10546: Leaving table
+CLIENT: 10547, EXIT
+CLIENT: 10544, EXIT
+CLIENT: 10545, EXIT
+CLIENT: 10546, EXIT
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+CLIENT: 10585, 4, WAITING TABLE
+CLIENT: 10582, 4, WAITING TABLE
+WORKER 10659: Service time 3 ns
+CLIENT 10605: Ottenuto piatto 1
+WORKER 10667: Service time 7 ns
+CLIENT 10597: Ottenuto piatto 1
+WORKER 10666: Service time 7 ns
+CLIENT 10629: Leaving table
+CLIENT 10628: Leaving table
+CLIENT: 10629, EXIT
+CLIENT: 10628, EXIT
+CLIENT: Waiting new day
+CLIENT: Waiting new day
+MAIN: Eseguo Refill al minuto 196
+WORKER 10639: Service time 7 ns
+CLIENT 10557: Ottenuto piatto 1
+CLIENT 10586: Ottenuto piatto 0
+CLIENT 10586: Chiede piatto 0 a Stazione 1
+WORKER 10640: Service time 7 ns
+CLIENT 10587: Ottenuto piatto 0
+CLIENT 10587: Chiede piatto 0 a Stazione 1
+WORKER 10638: Service time 7 ns
+CLIENT 10570: Ottenuto piatto 0
+CLIENT 10570: Chiede piatto 0 a Stazione 1
+WORKER: id 10658, role 2, WAITING
+MAIN: Fine giornata
+CLIENT 10564: Ottenuto piatto 0
+CLIENT 10606: Ottenuto piatto 0
+CLIENT 10560: Ottenuto piatto 0
+CLIENT 10607: Ottenuto piatto 0
+CLIENT 10578: Ottenuto piatto 0
+CLIENT 10541: Found table, Eating for 34 ns
+WORKER 10663: Giornata finita, esco.
+CLIENT 10565: Found table, Eating for 34 ns
+WORKER 10662: Giornata finita, esco.
+CLIENT 10563: Found table, Eating for 34 ns
+CLIENT 10542: Giornata finita, esco.
+MAIN: Reset day sem
+CLIENT 10543: Giornata finita, esco.
+CLIENT 10580: Giornata finita, esco.
+CLIENT 10577: Found table, Eating for 34 ns
+CLIENT 10579: Giornata finita, esco.
+CLIENT 10582: Found table, Eating for 34 ns
+CLIENT 10581: Giornata finita, esco.
+CLIENT 10583: Giornata finita, esco.
+CLIENT 10584: Giornata finita, esco.
+CLIENT 10587: Giornata finita, esco.
+CLIENT 10585: Found table, Eating for 34 ns
+CLIENT 10589: Found table, Eating for 34 ns
+CLIENT 10586: Giornata finita, esco.
+CLIENT 10588: Found table, Eating for 34 ns
+CLIENT 10591: Giornata finita, esco.
+CLIENT 10590: Giornata finita, esco.
+CLIENT 10592: Giornata finita, esco.
+CLIENT 10594: Giornata finita, esco.
+CLIENT 10593: Giornata finita, esco.
+CLIENT 10567: Giornata finita, esco.
+CLIENT 10568: Found table, Eating for 34 ns
+CLIENT 10570: Giornata finita, esco.
+CLIENT 10595: Found table, Eating for 34 ns
+CLIENT 10596: Giornata finita, esco.
+CLIENT 10569: Giornata finita, esco.
+CLIENT 10571: Found table, Eating for 34 ns
+CLIENT 10573: Giornata finita, esco.
+CLIENT 10572: Found table, Eating for 34 ns
+CLIENT 10576: Giornata finita, esco.
+CLIENT 10574: Giornata finita, esco.
+CLIENT 10575: Giornata finita, esco.
+CLIENT 10597: Giornata finita, esco.
+CLIENT 10599: Giornata finita, esco.
+CLIENT 10600: Giornata finita, esco.
+CLIENT 10601: Giornata finita, esco.
+CLIENT 10598: Found table, Eating for 34 ns
+CLIENT 10602: Giornata finita, esco.
+CLIENT 10604: Giornata finita, esco.
+CLIENT 10605: Giornata finita, esco.
+CLIENT 10608: Giornata finita, esco.
+CLIENT 10603: Found table, Eating for 34 ns
+CLIENT 10611: Giornata finita, esco.
+CLIENT 10610: Found table, Eating for 34 ns
+CLIENT 10609: Giornata finita, esco.
+CLIENT 10612: Giornata finita, esco.
+CLIENT 10613: Giornata finita, esco.
+CLIENT 10615: Giornata finita, esco.
+CLIENT 10616: Giornata finita, esco.
+CLIENT 10619: Found table, Eating for 34 ns
+CLIENT 10622: Giornata finita, esco.
+CLIENT 10618: Giornata finita, esco.
+CLIENT 10614: Giornata finita, esco.
+CLIENT 10617: Found table, Eating for 34 ns
+CLIENT 10623: Giornata finita, esco.
+CLIENT 10625: Giornata finita, esco.
+CLIENT 10627: Giornata finita, esco.
+CLIENT 10624: Giornata finita, esco.
+CLIENT 10626: Giornata finita, esco.
+CLIENT 10548: Giornata finita, esco.
+CLIENT 10550: Found table, Eating for 34 ns
+CLIENT 10551: Found table, Eating for 34 ns
+CLIENT 10552: Found table, Eating for 34 ns
+CLIENT 10549: Giornata finita, esco.
+CLIENT 10555: Found table, Eating for 34 ns
+CLIENT 10556: Giornata finita, esco.
+CLIENT 10557: Giornata finita, esco.
+CLIENT 10558: Found table, Eating for 34 ns
+CLIENT 10620: Found table, Eating for 34 ns
+CLIENT 10553: Found table, Eating for 34 ns
+CLIENT 10554: Giornata finita, esco.
+CLIENT 10559: Found table, Eating for 34 ns
+CLIENT 10561: Giornata finita, esco.
+CLIENT 10562: Giornata finita, esco.
+CLIENT 10630: Giornata finita, esco.
+CLIENT 10631: Found table, Eating for 34 ns
+CLIENT 10634: Giornata finita, esco.
+CLIENT 10636: Giornata finita, esco.
+CLIENT 10632: Giornata finita, esco.
+CLIENT 10564: Giornata finita, esco.
+CLIENT 10633: Giornata finita, esco.
+CLIENT 10635: Giornata finita, esco.
+CLIENT 10637: Giornata finita, esco.
+CLIENT 10621: Ottenuto piatto 0
+CLIENT 10607: Giornata finita, esco.
+CLIENT 10606: Giornata finita, esco.
+CLIENT 10560: Giornata finita, esco.
+CLIENT 10578: Giornata finita, esco.
+CLIENT 10621: Giornata finita, esco.
+WORKER 10656: Giornata finita, esco.
+WORKER 10640: Giornata finita, esco.
+WORKER 10647: Giornata finita, esco.
+WORKER 10659: Giornata finita, esco.
+WORKER 10643: Giornata finita, esco.
+WORKER 10660: Giornata finita, esco.
+WORKER 10648: Giornata finita, esco.
+WORKER 10652: Giornata finita, esco.
+WORKER 10642: Giornata finita, esco.
+WORKER 10653: Giornata finita, esco.
+WORKER 10638: Giornata finita, esco.
+WORKER 10641: Giornata finita, esco.
+WORKER 10646: Giornata finita, esco.
+WORKER 10655: Giornata finita, esco.
+WORKER 10649: Giornata finita, esco.
+WORKER 10661: Giornata finita, esco.
+WORKER 10658: Giornata finita, esco.
+WORKER 10639: Giornata finita, esco.
+WORKER 10657: Giornata finita, esco.
+WORKER 10667: Giornata finita, esco.
+WORKER 10644: Giornata finita, esco.
+WORKER 10645: Giornata finita, esco.
+WORKER 10651: Giornata finita, esco.
+WORKER 10666: Giornata finita, esco.
+WORKER 10654: Giornata finita, esco.
+WORKER 10650: Giornata finita, esco.
+WORKER 10664: Giornata finita, esco.
+WORKER 10665: Giornata finita, esco.
+CLIENT 10541: Leaving table
+CLIENT 10565: Leaving table
+CLIENT 10577: Leaving table
+CLIENT 10582: Leaving table
+CLIENT 10563: Leaving table
+CLIENT 10565: Giornata finita, esco.
+CLIENT 10577: Giornata finita, esco.
+CLIENT 10541: Giornata finita, esco.
+CLIENT 10582: Giornata finita, esco.
+CLIENT 10563: Giornata finita, esco.
+CLIENT 10589: Leaving table
+CLIENT 10585: Leaving table
+CLIENT 10588: Leaving table
+CLIENT 10585: Giornata finita, esco.
+CLIENT 10589: Giornata finita, esco.
+CLIENT 10588: Giornata finita, esco.
+CLIENT 10595: Leaving table
+CLIENT 10568: Leaving table
+CLIENT 10571: Leaving table
+CLIENT 10568: Giornata finita, esco.
+CLIENT 10595: Giornata finita, esco.
+CLIENT 10572: Leaving table
+CLIENT 10571: Giornata finita, esco.
+CLIENT 10572: Giornata finita, esco.
+CLIENT 10598: Leaving table
+CLIENT 10598: Giornata finita, esco.
+CLIENT 10603: Leaving table
+CLIENT 10603: Giornata finita, esco.
+CLIENT 10610: Leaving table
+CLIENT 10610: Giornata finita, esco.
+CLIENT 10619: Leaving table
+CLIENT 10619: Giornata finita, esco.
+CLIENT 10617: Leaving table
+CLIENT 10617: Giornata finita, esco.
+CLIENT 10550: Leaving table
+CLIENT 10551: Leaving table
+CLIENT 10552: Leaving table
+CLIENT 10550: Giornata finita, esco.
+CLIENT 10551: Giornata finita, esco.
+CLIENT 10552: Giornata finita, esco.
+CLIENT 10555: Leaving table
+CLIENT 10555: Giornata finita, esco.
+CLIENT 10558: Leaving table
+CLIENT 10620: Leaving table
+CLIENT 10620: Giornata finita, esco.
+CLIENT 10558: Giornata finita, esco.
+CLIENT 10553: Leaving table
+CLIENT 10553: Giornata finita, esco.
+CLIENT 10559: Leaving table
+CLIENT 10559: Giornata finita, esco.
+CLIENT 10631: Leaving table
+CLIENT 10631: Giornata finita, esco.
+MAIN: Fine sim

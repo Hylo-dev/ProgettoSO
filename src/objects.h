@@ -7,10 +7,21 @@
 #define DISH_NAME_MAX_LEN 32
 
 union _semun {
-    int val;
+    int              val;
     struct semid_ds *buf;
-    unsigned short *array;
+    unsigned short  *array;
 };
+
+#define SEM_CNT 7
+typedef enum {
+    shm      = 0,
+    out      = 1,
+    tbl      = 2,
+    wall     = 3,
+    wk_end   = 4,
+    cl_end   = 5,
+    disorder = 6,
+} ctx_sem;
 
 typedef int    sem_t;
 typedef size_t shmid_t;
@@ -26,30 +37,29 @@ typedef enum {
     EXIT         = 5
 } loc_t;
 
-struct pair_station{
+struct pair_station {
     loc_t id;
     int   avg_time;
 };
 
 typedef struct {
-    pid_t  pid;
+    pid_t pid;
 
     loc_t  role;
     size_t queue;
 
     bool   paused;
     size_t nof_pause;
-    size_t pause_time;  // cumulative time spent on pause
+    size_t pause_time; // cumulative time spent on pause
 } worker_t;
 
-
 typedef struct {
-    pid_t  pid;
-    bool   ticket;
-    loc_t  loc;
-    bool   served;
-    size_t msgq;
-    size_t wait_time;
+    pid_t   pid;
+    bool    ticket;
+    loc_t   loc;
+    bool    served;
+    size_t  msgq;
+    size_t  wait_time;
     ssize_t dishes[MAX_DISHES];
 } client_t;
 
@@ -65,11 +75,7 @@ typedef struct {
     size_t quantity;
 } dish_avl_t;
 
-typedef enum {
-    FIRST  = 0,
-    MAIN   = 1,
-    COFFEE = 2
-} dish_type;
+typedef enum { FIRST = 0, MAIN = 1, COFFEE = 2 } dish_type;
 
 typedef struct {
     size_t worked_time;
@@ -90,14 +96,14 @@ typedef struct {
     stats stats;
     loc_t type;
 
-    struct {    
+    struct {
         shmid_t shmid;
         size_t  cap;
         // a run time inizializzato a config.nof_wk_seats[type]
         // per gestire il massimo di lavoratori attivi (le pause)
-        sem_t   sem;
+        sem_t sem;
     } wk_data;
-    
+
     dish_t menu[DISHES_COUNT];
 } station;
 
@@ -146,14 +152,7 @@ typedef struct {
     stats  global_stats;
     conf_t config;
 
-    struct {
-        sem_t shm;
-        sem_t out;
-        sem_t tbl;
-        sem_t wall;
-        sem_t wk_end;
-        sem_t cl_end;
-    } sem;
+    sem_t sem[SEM_CNT];
 
     // Read && Write
     struct available_dishes {

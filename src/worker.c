@@ -74,10 +74,10 @@ main(
     while (true) {
         simctx_t* ctx = get_ctx(ctx_id);
         zprintf(
-            ctx->sem.out,
+            ctx->sem[out],
             "WORKER: WAITING INIT DAY\n"
         );
-        sem_wait(ctx->sem.wall);
+        sem_wait(ctx->sem[wall]);
 
         if (!ctx->is_sim_running) break;
 
@@ -104,9 +104,9 @@ main(
         /* ===================  WORK LOOP ==================== */
         work_with_pause(ctx, st, variance, &response, self);
 
-        sem_wait(ctx->sem.wk_end);
+        sem_wait(ctx->sem[wk_end]);
         if (!ctx->is_sim_running) {
-            zprintf(ctx->sem.out, "WORKER %d: Giornata finita, esco.\n", getpid());
+            zprintf(ctx->sem[out], "WORKER %d: Giornata finita, esco.\n", getpid());
             break;
         }
     }
@@ -124,7 +124,7 @@ work_with_pause(
 ) {
     while (ctx->is_sim_running && ctx->is_day_running) {
         zprintf(
-            ctx->sem.out,
+            ctx->sem[out],
             "WORKER: id %d, role %d, WAITING\n",
             self->pid, self->role
         );
@@ -151,9 +151,9 @@ work_with_pause(
 
         // AGGIORNAMENTO STATISTICHE
         // ------------------------------------------------
-        sem_wait(ctx->sem.shm); 
+        sem_wait(ctx->sem[shm]); 
         st->stats.total_breaks++;
-        sem_signal(ctx->sem.shm);
+        sem_signal(ctx->sem[shm]);
 
         self->pause_time += (size_t)ctx->config.stop_duration;
         znsleep((size_t)ctx->config.stop_duration);
@@ -202,7 +202,7 @@ work_shift(
                 sem_wait(st->sem);
                 if (active_workers > 1) {
                     zprintf(
-                        ctx->sem.out,
+                        ctx->sem[out],
                         "WORKER %d: Vado in pausa (Pausa n.%zu/%d)\n",
                         getpid(), self->nof_pause + 1, ctx->config.nof_pause
                     );
@@ -263,14 +263,14 @@ _serve_food(
 
             if (any_dish_left) {
                 zprintf(
-                    ctx->sem.out,
+                    ctx->sem[out],
                     "WORKER: Piatto %zu finito, ma altri disponibili.\n",
                     dish_id
                 );
                 response->status = RESPONSE_DISH_FINISHED;
             } else {
                 zprintf(
-                    ctx->sem.out, "WORKER: Stazione %d completamente vuota!\n",
+                    ctx->sem[out], "WORKER: Stazione %d completamente vuota!\n",
                     self->role
                 );
                 response->status = RESPONSE_CATEGORY_FINISHED;
@@ -278,7 +278,7 @@ _serve_food(
         }
     } else {
         zprintf(
-            ctx->sem.out,
+            ctx->sem[out],
             "ERRORE: ID Piatto %zu non trovato nel menu %d\n",
             dish_id, self->role
         );
@@ -315,19 +315,19 @@ serve_client(
     const size_t actual_time = get_service_time(avg, variance);
 
     zprintf(
-        ctx->sem.out,
+        ctx->sem[out],
         "WORKER %d: Service time %zu ns\n",
         getpid(),
         actual_time
     );
     znsleep(actual_time);
 
-    sem_wait(ctx->sem.shm);
+    sem_wait(ctx->sem[shm]);
 
     if (self->role != CHECKOUT)
         _serve_food(ctx, self, st, response, actual_time);    
     else
         _serve_checkout(st, response);
 
-    sem_signal(ctx->sem.shm);
+    sem_signal(ctx->sem[shm]);
 }

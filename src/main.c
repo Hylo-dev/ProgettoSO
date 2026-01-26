@@ -564,30 +564,39 @@ render_dashboard(
             }
         }
         
-        // Lampeggio più aggressivo: alterna ogni 2 update (invece di 3)
-        // e usa diversi stati di visibilità
         int blink_state = (min / 2) % 4;
         if (blink_state == 0 || blink_state == 2) {
             s_draw_text(s, box_x + box_w + 2, box_y, COL_RED, "!ALERT!");
         } else if (blink_state == 1) {
             s_draw_text(s, box_x + box_w + 2, box_y, COL_GRAY, "!ALERT!");
         }
-        // Sul 4° stato (blink_state == 3) non disegna nulla = spazio vuoto
-
     } else {
-        // *** STATO NORMALE (ONDA SINUSOIDALE) ***
-        // Usa caratteri Unicode per creare un'onda fluida e continua
-        const char* wave[] = {
-            "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█",  // Salita
-            "▇", "▆", "▅", "▄", "▃", "▂"              // Discesa
-        };
-        const int wave_count = 14;
+        // *** STATO NORMALE - Scegli uno stile: ***
+        
+        // OPZIONE 1: Heartbeat / ECG style (battito cardiaco)
+        const char* pattern[] = {"─", "─", "╱", "█", "╲", "─", "─", "─", "╱", "╲", "─", "─"};
+        
+        // OPZIONE 2: Pulse dots (pulsazione con punti)
+        // const char* pattern[] = {"·", "∘", "○", "◉", "●", "◉", "○", "∘", "·", " ", " ", " "};
+        
+        // OPZIONE 3: Spinning bars (barre rotanti - stile caricamento)
+        // const char* pattern[] = {"│", "╱", "─", "╲", "│", "╱", "─", "╲"};
+        
+        // OPZIONE 4: Wave tilde (onde con tilde)
+        // const char* pattern[] = {"˜", "∼", "≈", "∿", "〜", "∼", "≈", "˜"};
+        
+        // OPZIONE 5: Star pulse (pulsazione stellare)
+        // const char* pattern[] = {"·", "∗", "✦", "✧", "★", "✧", "✦", "∗", "·", " "};
+
+        // OPZIONE 6
+        // const char* pattern[] = {"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"}
+
+        const int pattern_count = sizeof(pattern) / sizeof(pattern[0]);
         const int view_w = 16;
 
-        // Crea effetto onda scorrevole moltiplicando per velocità
         for (int i = 0; i < view_w; i++) {
-            int idx = ((min * 2) + i) % wave_count;  // Velocità x2
-            s_draw_text(s, box_x + 5 + i, box_y, COL_GREEN, "%s", wave[idx]);
+            int idx = ((min * 2) + i) % pattern_count;
+            s_draw_text(s, box_x + 5 + i, box_y, COL_GREEN, "%s", pattern[idx]);
         }
     }
     s_draw_text(s, box_x + 21, box_y, COL_GRAY, "]");

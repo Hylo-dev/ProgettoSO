@@ -337,7 +337,8 @@ kill_scr(screen* s) {
     free_screen(s);
 }
 
-void render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
+void
+render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
     s_clear(s);
 
     // Dimensioni
@@ -474,44 +475,47 @@ void render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
     r++;
     
     const char* st_names[] = {"Primi", "Main ", "Caffe", "Cassa"};
+    
     it(i, 0, NOF_STATIONS) {
         float avg = st[i].stats.served_dishes > 0 ?
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
-            
-        int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
-        int cap    = (int)st[i].wk_data.cap;
-        
-        // Nome
+
+        int cap = (int)st[i].wk_data.cap;
+        int active =
+            ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
+
+        // RECUPERIAMO L'ARRAY DEI WORKER DALLA SHM
+        // Questo ci permette di vedere lo stato del singolo processo
+        const worker_t *wks = get_workers(st[i].wk_data.shmid);
+
+        // Nome Stazione
         s_draw_text(s, c2, r, COL_GRAY, "%s:", st_names[i]);
         
-        // Tempo (Allineato a destra manualmente)
-        char time_str[16];
-        sprintf(time_str, "%.0fns", avg);
-        s_draw_text(s, c2 + 7, r, COL_WHITE, "%6s", time_str);
-        
-        // Visualizzatore Operatori [■_]
-        // Lo spostiamo un po' più a destra per non accavallare
-        int bar_x = c2 + 18;
+        // Tempo Medio (Allineato)
+        s_draw_text(s, c2 + 7, r, COL_WHITE, "%4.0fns", avg);
+
+        s_draw_text(s, c2 + 17, r, COL_WHITE, "%02d/%02d", active, cap);
+
+        int bar_x = c2 + 22;
         s_draw_text(s, bar_x, r, COL_GRAY, "[");
         
-        for(int k=0; k<cap; k++) {
-            // Se k < active, operatore al lavoro
-            if (k < active) 
-                s_draw_text(s, bar_x + 1 + k, r, COL_WHITE, "\u25A0"); // Quadrato pieno
-            else 
+        for(int k=0; k < cap; k++) {
+            if (wks[k].paused)
                 s_draw_text(s, bar_x + 1 + k, r, COL_GRAY, "_"); 
-        }
+            else
+                s_draw_text(s, bar_x + 1 + k, r, COL_WHITE, "\u25A0"); 
+        }        
         s_draw_text(s, bar_x + 1 + cap, r, COL_GRAY, "]");
         
         r++;
     }
 
+    
     // --- 6. FOOTER ---
     s_draw_text(s, 2, H - 2, COL_GRAY, "Premi [q] per terminare la simulazione.");
     
     s_display(s);
 }
-
 
 /* ========================== SUPPORT ========================== */ 
 

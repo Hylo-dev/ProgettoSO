@@ -94,6 +94,7 @@ main(
             .pid        = getpid(),
             .role       = role,
             .queue      = queue,
+            .paused     = true,
             .nof_pause  = 0,
             .pause_time = 0,
         };
@@ -122,7 +123,6 @@ work_with_pause(
     worker_t *self
 ) {
     while (ctx->is_sim_running && ctx->is_day_running) {
-
         zprintf(
             ctx->sem.out,
             "WORKER: id %d, role %d, WAITING\n",
@@ -132,13 +132,17 @@ work_with_pause(
         /* ================== SEM OWNERSHIP ================== */
         struct timespec t_start, t_end;
         clock_gettime(CLOCK_REALTIME, &t_start);
-        sem_wait(st->wk_data.sem);
+        int res;
+        do {
+            res = sem_wait(st->wk_data.sem);
+        } while (res == -1 && errno == EINTR);
         clock_gettime(CLOCK_REALTIME, &t_end);
         const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * TO_NANOSEC +
                              (t_end.tv_nsec - t_start.tv_nsec);
         self->pause_time += (size_t)wait_ns;
 
         /* ====================== WORK ====================== */
+        self->paused = false;
         work_shift(ctx, st, variance, response, self);
 
         // 3. RILASCIO IL POSTO (Fine Turno)
@@ -195,15 +199,19 @@ work_shift(
                 int free_seats = sem_getval(st->wk_data.sem);
                 int active_workers = (int)st->wk_data.cap - free_seats;
 
+                sem_wait(st->sem);
                 if (active_workers > 1) {
                     zprintf(
                         ctx->sem.out,
                         "WORKER %d: Vado in pausa (Pausa n.%zu/%d)\n",
                         getpid(), self->nof_pause + 1, ctx->config.nof_pause
                     );
+                    self->paused = true;
                     self->nof_pause++;
+                    sem_signal(st->sem);
                     break; 
                 }
+                sem_signal(st->sem);
             }
         }
     }

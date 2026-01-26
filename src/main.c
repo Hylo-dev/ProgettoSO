@@ -628,7 +628,7 @@ write_shared_data(
     shmid_t st_shm
 ) {    
     FILE *f = zfopen("data/shared", "w");
-    fprintf(f, "%zu %zu\n", ctx_shm, st_shm);
+    fprintf(f, "%zu, %zu\n", ctx_shm, st_shm);
     fclose(f);
 }
 

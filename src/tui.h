@@ -41,12 +41,16 @@ enum {
     COL_RESET = 0,
     COL_WHITE,
     COL_GRAY,
+    COL_RED,
+    COL_GREEN
 };
 
 static const char *ANSI_COLORS[] = {
     "\x1b[0m",  // COL_RESET
     "\x1b[37m", // COL_WHITE
     "\x1b[90m", // COL_GRAY
+    "\x1b[31m", // COL_RED 
+    "\x1b[32m", // COL_GREEN 
 };
 
 #define ANSI_HOME "\x1b[H"

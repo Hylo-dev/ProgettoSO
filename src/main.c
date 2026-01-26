@@ -71,6 +71,7 @@ render_dashboard(
     screen*,
     simctx_t*,
     station*,
+    size_t,
     size_t
 );
 
@@ -195,7 +196,7 @@ sim_day(
     while (ctx->is_sim_running && current_min < WORK_DAY_MINUTES) {
         
         if (current_min % DASHBOARD_UPDATE_RATE == 0)
-            render_dashboard(s, ctx, stations, day + 1);
+            render_dashboard(s, ctx, stations, day + 1, current_min);
         
         if (s_getch() == 'q') {
             ctx->is_sim_running = false;
@@ -361,7 +362,13 @@ kill_scr(screen* s) {
 }
 
 void
-render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
+render_dashboard(
+    screen   *s,
+    simctx_t *ctx,
+    station  *st,
+    size_t    day,
+    size_t    min
+) {
     s_clear(s);
 
     // Dimensioni
@@ -536,7 +543,56 @@ render_dashboard(screen *s, simctx_t *ctx, station *st, size_t day) {
     
     // --- 6. FOOTER ---
     s_draw_text(s, 2, H - 2, COL_GRAY, "Premi [q] per terminare la simulazione.");
-    
+
+
+    int box_w = 22;
+    int box_x = mid_x + 2; // Margine destro
+    int box_y = H - 2;         // Stessa riga del footer
+
+    s_draw_text(s, box_x, box_y, COL_GRAY, "SYS:[");
+
+    if (ctx->is_disorder_active) {
+        // *** STATO DI DISORDER (FLATLINE con GLITCH) ***
+        // Flatline con occasionali glitch
+        const char* glitch_chars[] = {"▂", "▃", "▄"};
+        for (int i = 0; i < 15; i++) {
+            // Glitch casuale ogni tanto
+            if ((min + i) % 7 == 0 && i % 3 == 0) {
+                s_draw_text(s, box_x + 5 + i, box_y, COL_RED, "%s", glitch_chars[i % 3]);
+            } else {
+                s_draw_text(s, box_x + 5 + i, box_y, COL_RED, "▁");
+            }
+        }
+        
+        // Lampeggio più aggressivo: alterna ogni 2 update (invece di 3)
+        // e usa diversi stati di visibilità
+        int blink_state = (min / 2) % 4;
+        if (blink_state == 0 || blink_state == 2) {
+            s_draw_text(s, box_x + box_w + 2, box_y, COL_RED, "!ALERT!");
+        } else if (blink_state == 1) {
+            s_draw_text(s, box_x + box_w + 2, box_y, COL_GRAY, "!ALERT!");
+        }
+        // Sul 4° stato (blink_state == 3) non disegna nulla = spazio vuoto
+
+    } else {
+        // *** STATO NORMALE (ONDA SINUSOIDALE) ***
+        // Usa caratteri Unicode per creare un'onda fluida e continua
+        const char* wave[] = {
+            "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█",  // Salita
+            "▇", "▆", "▅", "▄", "▃", "▂"              // Discesa
+        };
+        const int wave_count = 14;
+        const int view_w = 16;
+
+        // Crea effetto onda scorrevole moltiplicando per velocità
+        for (int i = 0; i < view_w; i++) {
+            int idx = ((min * 2) + i) % wave_count;  // Velocità x2
+            s_draw_text(s, box_x + 5 + i, box_y, COL_GREEN, "%s", wave[idx]);
+        }
+    }
+    s_draw_text(s, box_x + 21, box_y, COL_GRAY, "]");
+
+        
     s_display(s);
 }
 

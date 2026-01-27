@@ -293,19 +293,27 @@ _serve_checkout(
     msg_t    *response
 ) {
 
+    if (ctx->is_disorder_active) {
+        zprintf(ctx->sem[out], "WORKER: Cassa guasta (Disorder)!\n");
+        response->status = ERROR;
+        return;
+    }
+
+    int res;
+    do {
+        res = sem_wait(ctx->sem[disorder]);
+    } while (res == -1 && errno == EINTR);
+
+    if (res == -1) {
+        response->status = ERROR;
+        return;
+    }
+
+    sem_signal(ctx->sem[disorder]);
+
     // TODO FIX : during the disorder, at the start, the earings continue rising
           size_t price    = response->price;
     const size_t discount = (price * DISCOUNT_DISH) / 100;
-
-    if (sem_wait(ctx->sem[disorder]) == -1) {
-        response->status = ERROR;
-        return;
-    }
-
-    if (sem_signal(ctx->sem[disorder]) == -1) {
-        response->status = ERROR;
-        return;
-    }
 
     price -= discount;
     sem_wait(st->sem);

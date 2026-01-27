@@ -144,7 +144,7 @@ main(int argc, char **argv) {
             s_display(screen);
             break;
         } else         
-                s_draw_text(screen, 2, 6,COL_WHITE, "Premi [q] per distruggere IPC e uscire.");
+            s_draw_text(screen, 2, 6,COL_WHITE, "Premi [q] per distruggere IPC e uscire.");
 
         s_display(screen);
         usleep(100000);
@@ -179,7 +179,10 @@ sim_day(
     if (day > 0) assign_roles(ctx, stations);
 
     zprintf(ctx->sem[out], "MAIN: Inizio giornata\n");
+
+    sem_wait(ctx->sem[shm]);
     ctx->is_day_running = true;
+    sem_signal(ctx->sem[shm]);
 
     // Settato per la quantita di wk attivi
     sem_set(ctx->sem[wall],   ctx->config.nof_workers + ctx->config.nof_users);
@@ -205,10 +208,8 @@ sim_day(
 
         znsleep(1); 
         current_min++;
-
         
         if (current_min >= next_refill_min) {
-            
             zprintf(ctx->sem[out], "MAIN: Eseguo Refill al minuto %zu\n", current_min);
 
             sem_wait(ctx->sem[shm]);
@@ -236,8 +237,7 @@ sim_day(
     
     zprintf(ctx->sem[out], "MAIN: Fine giornata\n");
 
-    int users_inside = ctx->config.nof_users - sem_getval(ctx->sem[cl_end]);
-    
+    const int users_inside = ctx->config.nof_users - sem_getval(ctx->sem[cl_end]);
     if (users_inside > 0) {
         ctx->global_stats.users_not_served += users_inside;
     }

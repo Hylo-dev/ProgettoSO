@@ -65,19 +65,29 @@ main(void) {
     }
 
     printf("[INFO] Disorder started\n\n");
-	ctx->is_disorder_active = true;
-	sem_wait(g_sem_disorder);
+    ctx->is_disorder_active = true;
 
-	size_t value = sem_getval(g_sem_disorder);
-	printf("[INFO] Set signal Value %zu\n", value);
+    int res;
+    do {
+        res = sem_wait(g_sem_disorder);
+    } while (res == -1 && errno == EINTR);
+
+    if (res == -1) {
+        perror("[DISORDER] Errore critico in sem_wait");
+        ctx->is_disorder_active = false;
+        return 1;
+    }
+
+    size_t value = sem_getval(g_sem_disorder);
+    printf("[INFO] Current wait Value %zu\n", value);
 
     znsleep(ctx->config.disorder_duration);
 
     ctx->is_disorder_active = false;
     sem_signal(g_sem_disorder);
 
-	value = sem_getval(g_sem_disorder);
-	printf("[INFO] Set wait %zu\n", value);
+    value = sem_getval(g_sem_disorder);
+	printf("[INFO] Current signal value %zu\n", value);
 
     printf("\n[INFO] End disorder executable.\n");
     return 0;

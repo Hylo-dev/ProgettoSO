@@ -12,14 +12,15 @@ union _semun {
     unsigned short  *array;
 };
 
-#define SEM_CNT 6
+#define SEM_CNT 7
 typedef enum {
     shm      = 0,
     out      = 1,
     tbl      = 2,
     wall     = 3,
     wk_end   = 4,
-    cl_end   = 5
+    cl_end   = 5,
+    disorder = 6,
 } ctx_sem;
 
 typedef int    sem_t;

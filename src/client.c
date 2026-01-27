@@ -74,6 +74,7 @@ main(
             ctx->sem[out],
             "CLIENT: Waiting new day\n"
         );
+
         sem_wait(ctx->sem[wall]);
 
         if (!ctx->is_sim_running) break;
@@ -195,11 +196,13 @@ send_request(
 
                 } else {
                     sem_signal(ctx->sem[shm]);
-                    sem_wait(group->sem);
+                    if (sem_wait(group->sem) == -1) {
+                        sem_signal(group->sem);
+                        return;
+                    }
                     sem_signal(group->sem);
                 }
 
-                // IMPORTANT: TODO: add clients groups support here
                 sem_wait(ctx->sem[tbl]);
 
                 zprintf(

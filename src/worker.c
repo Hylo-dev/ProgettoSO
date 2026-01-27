@@ -288,22 +288,30 @@ _serve_food(
 
 static inline void
 _serve_checkout(
-    station *st,
-    msg_t   *response
+    simctx_t *ctx,
+    station  *st,
+    msg_t    *response
 ) {
-    if (sem_wait(st->sem) == -1) {
-        response->status = ERROR;
-        return;
-    }
-    // TODO FIX : during the disorter, at the start, the earings continue rising
+
+    // TODO FIX : during the disorder, at the start, the earings continue rising
           size_t price    = response->price;
     const size_t discount = (price * DISCOUNT_DISH) / 100;
 
+    if (sem_wait(ctx->sem[disorder]) == -1) {
+        response->status = ERROR;
+        return;
+    }
+
+    if (sem_signal(ctx->sem[disorder]) == -1) {
+        response->status = ERROR;
+        return;
+    }
+
     price -= discount;
-    // sem_wait(st->sem);
+    sem_wait(st->sem);
     st->stats.earnings += price;
     sem_signal(st->sem);
-    
+
     response->status = RESPONSE_OK;
 }
 
@@ -331,7 +339,6 @@ serve_client(
         sem_wait(ctx->sem[shm]);
         _serve_food(ctx, self, st, response, actual_time);
         sem_signal(ctx->sem[shm]);
-    } else 
-        _serve_checkout(st, response);
-    
+
+    } else { _serve_checkout(ctx, st, response); }
 }

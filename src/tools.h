@@ -208,20 +208,28 @@ sem_set(
 ) {
     union _semun arg;
     arg.val = val;
+
     if (semctl(id, 0, SETVAL, arg) == -1)
         panic("ERROR: set_sem failed\n");
 }
 
 // Operazione: Aspetta che il sem sia = 0
-static inline void
+static inline int
 sem_wait_zero(const sem_t id) {
     struct sembuf sem_b;
     sem_b.sem_num = 0;
     sem_b.sem_op  = 0; // Usato per indicare di settarlo a zero
     sem_b.sem_flg = 0;
 
-    if (semop(id, &sem_b, 1) == -1)
+    if (semop(id, &sem_b, 1) == -1) {
+        if (errno == EINTR || errno == EIDRM || errno == EINVAL) {
+            return -1;
+        }
+
         panic("ERROR: sem_wait_zero failed\n");
+    }
+
+    return 0;
 }
 
 static inline int

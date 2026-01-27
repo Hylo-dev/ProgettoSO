@@ -511,8 +511,7 @@ render_dashboard(
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
 
         int cap = (int)st[i].wk_data.cap;
-        int active =
-            ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
+        int active = ctx->config.nof_wk_seats[i] - sem_getval(st[i].wk_data.sem);
 
         // RECUPERIAMO L'ARRAY DEI WORKER DALLA SHM
         // Questo ci permette di vedere lo stato del singolo processo
@@ -623,6 +622,7 @@ init_ctx(
 
     ctx->sem[out]      = sem_init(1);
     ctx->sem[shm]      = sem_init(1);
+    ctx->sem[disorder] = sem_init(1);
     ctx->sem[wk_end]   = sem_init(0);
     ctx->sem[cl_end]   = sem_init(0);
     ctx->sem[wall]     = sem_init(0);

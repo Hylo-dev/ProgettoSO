@@ -655,8 +655,9 @@ render_dashboard(
             s_draw_text(s, box_x + box_w + 2, box_y, COL_GRAY, "!ALERT!");
         }
     } else {
-        const char* pattern[] = {"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"};
-
+        const char *pattern[]     = {"▂", "▂", "▃", "▃", "▄", "▄", "▅", "▅",
+                                     "▆", "▆", "▇", "▇", "▇", "▆", "▆", "▅",
+                                     "▅", "▄", "▄", "▃", "▃", "▂", "▂"};
         const int pattern_count = sizeof(pattern) / sizeof(pattern[0]);
         const int view_w = 16;
 

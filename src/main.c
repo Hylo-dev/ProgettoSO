@@ -27,6 +27,14 @@ static struct {
     size_t cnt;
 } g_client_pids;
 
+volatile sig_atomic_t g_users_req = 0; // Flag per il segnale
+static shmid_t g_shmid = 0;            // Per passare l'ID a init_client
+
+void
+handler_new_users(int sig) {
+    (void)sig;
+    g_users_req = 1;
+}
 
 /* Prototipi */
 void
@@ -59,6 +67,8 @@ void      release_station(station);
 void      write_shared_data(shmid_t, shmid_t);
 void      reset_shared_data();
 
+int       process_new_users(simctx_t *ctx);
+
 void      release_clients(simctx_t*);
 
 void      kill_all_child(simctx_t*, station*);
@@ -75,7 +85,8 @@ render_dashboard(
     simctx_t*,
     station*,
     size_t,
-    size_t
+    size_t,
+    int
 );
 
 int
@@ -107,6 +118,7 @@ main(int argc, char **argv) {
     const size_t ctx_shm  = zshmget(
         sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t))
     );
+    
     simctx_t* ctx = init_ctx(ctx_shm, conf);
 
     const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
@@ -185,9 +197,13 @@ sim_day(
     );
 
     while (ctx->is_sim_running && current_min < WORK_DAY_MINUTES) {
+        int n_new = process_new_users(ctx);
         
-        if (current_min % DASHBOARD_UPDATE_RATE == 0)
-            render_dashboard(s, ctx, stations, day + 1, current_min);
+        if (n_new > 0)
+             sem_set(ctx->sem[cl_end], ctx->config.nof_users);
+
+        if (current_min % DASHBOARD_UPDATE_RATE == 0 || n_new > 0)
+            render_dashboard(s, ctx, stations, day + 1, current_min, n_new);
         
         if (s_getch() == 'q') {
             ctx->is_sim_running = false;
@@ -452,7 +468,8 @@ render_dashboard(
     simctx_t *ctx,
     station  *st,
     size_t    day,
-    size_t    min
+    size_t    min,
+    int       new_clients
 ) {
     s_clear(s);
 
@@ -460,6 +477,15 @@ render_dashboard(
     const size_t W = s->cols;
     const size_t H = s->rows;
     const size_t mid_x = W / 2; // Punto centrale esatto
+
+
+    static int notification_timer = 0;
+    static int saved_user_count = 0;
+
+    if (new_clients> 0) {
+        notification_timer = 50; 
+        saved_user_count = new_clients;
+    }
     
     // --- 1. CORNICE E TITOLO ---
     draw_box(s, 0, 0, W, H, COL_GRAY);
@@ -626,12 +652,21 @@ render_dashboard(
 
     
     // --- 6. FOOTER ---
+
+    int footer_y = s->rows - 4;
+
+    if (notification_timer > 0) {
+        s_draw_text(s, 2, footer_y, COL_GREEN, "!!! ARRIVATI %d NUOVI CLIENTI !!!", saved_user_count);
+        
+        notification_timer--;
+    }
+    
     s_draw_text(s, 2, H - 2, COL_GRAY, "Premi [q] per terminare la simulazione.");
 
 
     int box_w = 22;
-    int box_x = mid_x + 2; // Margine destro
-    int box_y = H - 2;         // Stessa riga del footer
+    int box_x = mid_x + 2; 
+    int box_y = H - 2;     
 
     s_draw_text(s, box_x, box_y, COL_GRAY, "SYS:[");
 
@@ -767,6 +802,13 @@ write_shared_data(
     FILE *f_pid = zfopen("data/main.pid", "w");
     fprintf(f_pid, "%d", getpid());
     fclose(f_pid);
+
+    g_shmid = ctx_shm;
+
+    struct sigaction sa_add;
+    memset(&sa_add, 0, sizeof(sa_add));
+    sa_add.sa_handler = handler_new_users;
+    sigaction(SIGUSR2, &sa_add, NULL);
 }
 
 void
@@ -778,6 +820,34 @@ reset_shared_data() {
     FILE *f_pid = zfopen("data/main.pid", "w");
     fprintf(f_pid, "%d", -1);
     fclose(f_pid);
+}
+
+int
+process_new_users(simctx_t *ctx) {
+    sem_wait(ctx->sem[shm]);
+    int num_new = ctx->added_users;
+    if (num_new > 0) {
+        ctx->added_users = 0;
+    }
+    sem_signal(ctx->sem[shm]);
+
+    if (num_new <= 0)
+        return 0;
+
+    zprintf(ctx->sem[out], "[MAIN] Ricevuta richiesta per %d nuovi utenti!\n", num_new);
+
+    size_t old_count = g_client_pids.cnt;
+    size_t new_total = old_count + num_new;
+    pid_t *new_ptr   = zrealloc(g_client_pids.id, new_total * sizeof(pid_t));
+    g_client_pids.id = new_ptr;
+
+    it(i, 0, num_new) init_client(g_shmid, old_count + i);
+
+    sem_wait(ctx->sem[shm]);
+    ctx->config.nof_users += num_new;
+    sem_signal(ctx->sem[shm]);
+
+    return num_new;
 }
 
 station*

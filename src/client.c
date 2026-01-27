@@ -191,15 +191,13 @@ send_request(
                 group->members_ready++;
 
                 if (group->members_ready == group->total_members) {
-                    sem_signal(group->sem);
+                    it(i, 0, group->total_members - 1) {
+                        sem_signal(group->sem);
+                    }
                     sem_signal(ctx->sem[shm]);
 
                 } else {
                     sem_signal(ctx->sem[shm]);
-                    if (sem_wait(group->sem) == -1) {
-                        sem_signal(group->sem);
-                        return;
-                    }
                     sem_signal(group->sem);
                 }
 

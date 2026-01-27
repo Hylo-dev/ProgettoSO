@@ -761,8 +761,12 @@ write_shared_data(
     shmid_t st_shm
 ) {    
     FILE *f = zfopen("data/shared", "w");
-    fprintf(f, "%zu, %zu\n", ctx_shm, st_shm);
+    fprintf(f, "%d, %d\n", (int)ctx_shm, (int)st_shm);
     fclose(f);
+
+    FILE *f_pid = zfopen("data/main.pid", "w");
+    fprintf(f_pid, "%d", getpid());
+    fclose(f_pid);
 }
 
 void
@@ -770,6 +774,10 @@ reset_shared_data() {
     FILE *f = zfopen("data/shared", "w");
     fprintf(f, "%d, %d\n", -1, -1);
     fclose(f);
+
+    FILE *f_pid = zfopen("data/main.pid", "w");
+    fprintf(f_pid, "%d", -1);
+    fclose(f_pid);
 }
 
 station*

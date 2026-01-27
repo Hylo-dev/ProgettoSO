@@ -299,12 +299,7 @@ _serve_checkout(
         return;
     }
 
-    int res;
-    do {
-        res = sem_wait(ctx->sem[disorder]);
-    } while (res == -1 && errno == EINTR);
-
-    if (res == -1) {
+    if (sem_wait(ctx->sem[disorder]) == -1) {
         response->status = ERROR;
         return;
     }

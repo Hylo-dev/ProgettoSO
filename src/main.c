@@ -67,6 +67,9 @@ screen*   init_scr();
 void      kill_scr(screen* s);
 
 void
+render_final_report(screen *s, simctx_t *ctx, station *st);
+
+void
 render_dashboard(
     screen*,
     simctx_t*,
@@ -133,22 +136,7 @@ main(int argc, char **argv) {
     ctx->is_day_running = false;
 
     zprintf(ctx->sem[out], "MAIN: Fine sim\n");
-
-    while (true) {
-        s_clear(screen);
-        s_draw_text(screen, 2, 2,COL_WHITE, "--- SIMULAZIONE COMPLETATA ---");
-        s_draw_text(screen, 2, 4,COL_WHITE,  "Statistiche finali pronte.");
-
-        if (s_getch() == 'q') {
-            s_draw_text(screen, 2, 6,COL_WHITE, "QUITTING...");
-            s_display(screen);
-            break;
-        } else         
-            s_draw_text(screen, 2, 6,COL_WHITE, "Premi [q] per distruggere IPC e uscire.");
-
-        s_display(screen);
-        usleep(100000);
-    }
+    render_final_report(screen, ctx, stations);
 
     reset_shared_data();
     
@@ -359,6 +347,103 @@ void
 kill_scr(screen* s) {
     reset_terminal();
     free_screen(s);
+}
+
+void
+render_final_report(screen *s, simctx_t *ctx, station *st) {
+    int users_unserved = ctx->global_stats.users_not_served;
+    int limit_users    = ctx->config.overload_threshold;
+    bool is_failure    = (users_unserved >= limit_users) || ctx->is_disorder_active;
+
+    // Colori e Messaggi di Stato
+    int status_col = is_failure ? COL_RED : COL_GREEN;
+    const char* title_status = is_failure ? "SIMULAZIONE TERMINATA: CRITICA" : "SIMULAZIONE COMPLETATA";
+
+    char reason[128];
+    if (is_failure) {
+        if (ctx->is_disorder_active)
+            sprintf(reason, "MOTIVO: Disordine in sala (Rissa/Caos scoppiato)");
+        else
+            sprintf(reason, "MOTIVO: Overload (%d/%d utenti insoddisfatti)", users_unserved, limit_users);
+    } else {
+        sprintf(reason, "MOTIVO: Orario di chiusura raggiunto");
+    }
+
+    while (true) {
+        s_clear(s);
+        const int W = s->cols;
+        const int H = s->rows;
+        const int mid_x = W / 2;
+
+        // --- HEADER ---
+        draw_box(s, 0, 0, W, H, COL_WHITE);
+        draw_box(s, 1, 1, W - 2, 5, status_col); // Box colorato per lo stato
+
+        // Titolo centrato
+        s_draw_text(s, (W - strlen(title_status)) / 2, 2, COL_WHITE, "%s", title_status);
+        s_draw_text(s, (W - strlen(reason)) / 2, 3, COL_WHITE, "%s", reason);
+
+        // --- COLONNA SINISTRA: GLOBAL STATS ---
+        int r = 8;
+        int c1 = 4;
+
+        s_draw_text(s, c1, r++, COL_WHITE, "RISULTATI GLOBALI:");
+        draw_hline(s, c1, r++, 30, COL_GRAY);
+
+        // Calcoli
+        float avg_earnings = ctx->global_stats.served_dishes > 0 ?
+            (float)ctx->global_stats.earnings / ctx->global_stats.served_dishes : 0.0f;
+
+        s_draw_text(s, c1, r++, COL_GRAY, "Incasso Totale:      %s%zu EUR", ANSI_COLORS[COL_GREEN], ctx->global_stats.earnings);
+        s_draw_text(s, c1, r++, COL_GRAY, "Piatti Serviti:      %s%zu", ANSI_COLORS[COL_WHITE], ctx->global_stats.served_dishes);
+        s_draw_text(s, c1, r++, COL_GRAY, "Utenti Non Serviti:  %s%zu", ANSI_COLORS[is_failure ? COL_RED : COL_WHITE], ctx->global_stats.users_not_served);
+        s_draw_text(s, c1, r++, COL_GRAY, "Incasso Medio/Piatto:%s%.2f EUR", ANSI_COLORS[COL_WHITE], avg_earnings);
+        s_draw_text(s, c1, r++, COL_GRAY, "Pause Totali Staff:  %s%zu", ANSI_COLORS[COL_WHITE], ctx->global_stats.total_breaks);
+
+        // --- COLONNA DESTRA: DETTAGLIO STAZIONI ---
+        int c2 = mid_x + 2;
+        r = 8;
+
+        s_draw_text(s, c2, r++, COL_WHITE, "DETTAGLIO REPARTI:");
+        draw_hline(s, c2, r++, W - c2 - 4, COL_GRAY);
+
+        // Intestazione Tabella
+        s_draw_text(s, c2, r, COL_GRAY, "REP.   | SERVITI | RICAVO  | EFFICIENZA");
+        r++;
+        draw_hline(s, c2, r++, W - c2 - 4, COL_GRAY);
+
+        const char* names[] = {"PRIMI", "SECND", "CAFFE", "CASSA"};
+
+        it(i, 0, NOF_STATIONS) {
+            size_t srv = st[i].stats.served_dishes;
+            size_t ear = st[i].stats.earnings;
+            size_t time = st[i].stats.worked_time;
+
+            // Calcolo tempo medio per servizio (ns o ms simulati)
+            float efficiency = (srv > 0) ? (float)time / srv : 0.0f;
+
+            s_draw_text(s, c2, r++, COL_WHITE, "%-6s | %-7zu | %-5zu E | %4.0f unit/srv",
+                names[i], srv, ear, efficiency);
+        }
+
+        // --- FOOTER ---
+        int footer_y = H - 3;
+        draw_hline(s, 1, footer_y - 1, W - 2, COL_GRAY);
+        s_draw_text(s, 4, footer_y, COL_WHITE, "Premi [Q] per distruggere le risorse IPC e uscire.");
+
+        if (is_failure) {
+            s_draw_text(s, 4, footer_y + 1, COL_RED, "ATTENZIONE: Controllare i parametri di configurazione (user count, speeds).");
+        } else {
+             s_draw_text(s, 4, footer_y + 1, COL_GREEN, "Ottimo lavoro! La giornata si è conclusa senza incidenti.");
+        }
+
+        s_display(s);
+
+        char c = s_getch();
+        if (c == 'q' || c == 'Q') break;
+
+        usleep(100000); // 100ms refresh per non bruciare la CPU
+    }
 }
 
 void

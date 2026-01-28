@@ -32,5 +32,6 @@ static unsigned long var_srvc[] = {
 #define REFILL_INTERVAL 10
 
 #define DASHBOARD_UPDATE_RATE 30
+#define TUI_NOTIFICATIONS_LEN 10
 
 #endif

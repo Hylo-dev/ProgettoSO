@@ -489,7 +489,7 @@ render_dashboard(
     static int saved_user_count = 0;
 
     if (new_clients> 0) {
-        notification_timer = 50;
+        notification_timer = TUI_NOTIFICATIONS_LEN;
         saved_user_count = new_clients;
     }
 

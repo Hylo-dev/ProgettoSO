@@ -1,6 +1,5 @@
 #include <signal.h>
 #include <stdint.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -20,7 +19,6 @@
 #include "tui.h"
 
 
-// lista prioritaria per assegnare i lavoratori alle stazioni, calcolata una sola volta.
 static int g_priority_list[4];
 static struct {
     pid_t* id;
@@ -61,7 +59,7 @@ void assign_roles(
 );
 simctx_t* init_ctx(size_t, conf_t);
 void      release_ctx(shmid_t, simctx_t*);
-station*  init_stations(simctx_t*, size_t);
+station* init_stations(simctx_t*, size_t);
 void      release_station(station);
 
 void      write_shared_data(shmid_t, shmid_t);
@@ -73,7 +71,7 @@ void      release_clients(simctx_t*);
 
 void      kill_all_child(simctx_t*, station*);
 
-screen*   init_scr();
+screen* init_scr();
 void      kill_scr(screen* s);
 
 void
@@ -118,11 +116,11 @@ main(int argc, char **argv) {
     const size_t ctx_shm  = zshmget(
         sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t))
     );
-    
+
     simctx_t* ctx = init_ctx(ctx_shm, conf);
 
     const size_t    st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
-          station*  stations = init_stations(ctx, st_shm);
+          station* stations = init_stations(ctx, st_shm);
 
     write_shared_data(ctx_shm, st_shm);
 
@@ -140,31 +138,31 @@ main(int argc, char **argv) {
     }
 
     it(i, 0, ctx->config.sim_duration) {
-        if (!ctx->is_sim_running) break; 
+        if (!ctx->is_sim_running) break;
         sim_day(ctx, stations, i, screen);
     }
 
-    ctx->is_sim_running = false; 
+    ctx->is_sim_running = false;
     ctx->is_day_running = false;
 
     zprintf(ctx->sem[out], "MAIN: Fine sim\n");
     render_final_report(screen, ctx, stations);
 
     reset_shared_data();
-    
+
     it(i, 0, NOF_STATIONS)
         release_station(stations[i]);
 
     shmdt(stations);
     shm_kill(st_shm);
-    
+
     release_clients(ctx);
 
     sem_set(ctx->sem[wall], ctx->config.nof_workers + ctx->config.nof_users);
     while(wait(NULL) > 0);
 
     release_ctx(ctx_shm, ctx);
-    
+
     kill_scr(screen);
     return 0;
 }
@@ -190,29 +188,29 @@ sim_day(
     sem_set(ctx->sem[cl_end], ctx->config.nof_users  );
 
     size_t current_min = 0;
-    
+
     size_t next_refill_min = get_service_time(
-        ctx->config.avg_refill_time, 
+        ctx->config.avg_refill_time,
         var_srvc[4]
     );
 
     while (ctx->is_sim_running && current_min < WORK_DAY_MINUTES) {
         int n_new = process_new_users(ctx);
-        
+
         if (n_new > 0)
              sem_set(ctx->sem[cl_end], ctx->config.nof_users);
 
         if (current_min % DASHBOARD_UPDATE_RATE == 0 || n_new > 0)
             render_dashboard(s, ctx, stations, day + 1, current_min, n_new);
-        
+
         if (s_getch() == 'q') {
             ctx->is_sim_running = false;
             break;
         }
 
-        znsleep(1); 
+        znsleep(1);
         current_min++;
-        
+
         if (current_min >= next_refill_min) {
             zprintf(ctx->sem[out], "MAIN: Eseguo Refill al minuto %zu\n", current_min);
 
@@ -222,7 +220,7 @@ sim_day(
                 const size_t size_avl = ctx->avl_dishes[loc_idx].size;
                 const size_t max      = ctx->config.max_porzioni[loc_idx];
                 const size_t refill   = ctx->config.avg_refill[loc_idx];
-                
+
                 it (j, 0, size_avl) {
                     size_t* qty = &elem_avl[j].quantity;
                     *qty += refill;
@@ -238,7 +236,7 @@ sim_day(
             next_refill_min = current_min + interval;
         }
     }
-    
+
     zprintf(ctx->sem[out], "MAIN: Fine giornata\n");
 
     const int users_inside = ctx->config.nof_users - sem_getval(ctx->sem[cl_end]);
@@ -250,23 +248,31 @@ sim_day(
         zprintf(ctx->sem[out], "MAIN: Sim end overload (Users left: %d)\n", users_inside);
         ctx->is_sim_running = false;
     }
-    
+
     it(i, 0, NOF_STATIONS) {
         ctx->global_stats.served_dishes += stations[i].stats.served_dishes;
         ctx->global_stats.earnings      += stations[i].stats.earnings;
         ctx->global_stats.total_breaks  += stations[i].stats.total_breaks;
         ctx->global_stats.worked_time   += stations[i].stats.worked_time;
     }
-    
+
+    // Save current stats on file CSV (Integrato da main.c)
+    save_stats_csv(ctx, stations, day);
+
+    // Reset daily stats (Integrato da main.c)
+    it(i, 0, NOF_STATIONS) {
+        memset(&stations[i].stats, 0, sizeof(stats));
+    }
+
     ctx->is_day_running = false;
     kill_all_child(ctx, stations);
-    
+
     zprintf(ctx->sem[out], "MAIN: Reset day sem\n");
     sem_wait_zero(ctx->sem[wk_end]);
     sem_wait_zero(ctx->sem[cl_end]);
 }
 
-/* ========================== PROCESSES ========================== */ 
+/* ========================== PROCESSES ========================== */
 
 void
 init_worker (
@@ -284,7 +290,7 @@ init_worker (
             itos((int)st_id ),
             itos((int)idx   ),
             itos(     role  ),
-            NULL 
+            NULL
         };
 
         execve("./bin/worker", args, NULL);
@@ -348,7 +354,7 @@ init_client(
     g_client_pids.id[g_client_pids.cnt++] = pid;
 }
 
-/* =========================== OUTPUT =========================== */ 
+/* =========================== OUTPUT =========================== */
 
 screen*
 init_scr() {
@@ -483,13 +489,13 @@ render_dashboard(
     static int saved_user_count = 0;
 
     if (new_clients> 0) {
-        notification_timer = 50; 
+        notification_timer = 50;
         saved_user_count = new_clients;
     }
-    
+
     // --- 1. CORNICE E TITOLO ---
     draw_box(s, 0, 0, W, H, COL_GRAY);
-    
+
     // Titolo centrato (Riga 1, dentro il box)
     const char* title = " OASI DEL GOLFO - DASHBOARD "; // Spazi per estetica
     size_t t_len = strlen(title); // Nota: solo ASCII qui, quindi strlen è ok per centrare
@@ -509,12 +515,12 @@ render_dashboard(
     int u_total    = ctx->config.nof_users;
     int u_finished = sem_getval(ctx->sem[cl_end]);
     int u_inside   = u_total - u_finished;
-    
+
     if (u_total > 0) {
-        int bar_w = 20; 
+        int bar_w = 20;
         int bar_x = W - bar_w - 15;
         float pct = (float)u_inside / (float)u_total;
-        
+
         s_draw_text(s, bar_x - 7, 1, COL_GRAY, "Users:");
         s_draw_bar(s, bar_x, 1, bar_w, pct, COL_WHITE, COL_GRAY);
         s_draw_text(s, bar_x + bar_w + 1, 1, COL_WHITE, "%d/%d", u_inside, u_total);
@@ -525,9 +531,9 @@ render_dashboard(
 
     size_t r = 4;
     size_t c1 = 2; // Margine sinistro colonna 1
-    
-    s_draw_text(s, c1, r++, COL_WHITE, "\u25BA STATISTICHE FLUSSO"); 
-    r++; 
+
+    s_draw_text(s, c1, r++, COL_WHITE, "\u25BA STATISTICHE FLUSSO");
+    r++;
 
     size_t tot_served = 0;
     size_t tot_breaks = 0;
@@ -547,13 +553,13 @@ render_dashboard(
 
     s_draw_text(s, c1 + 2, r, COL_GRAY, "Seduti ai tavoli:");
     s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%d", u_eating);
-    
+
     r += 2;
-    
+
     // Sezione 2
     s_draw_text(s, c1, r++, COL_WHITE, "\u25BA ECONOMIA & STAFF");
     r++;
-    
+
     size_t revenue = st[CHECKOUT].stats.earnings;
     s_draw_text(s, c1 + 2, r, COL_GRAY, "Incasso:");
     s_draw_text(s, c1 + 2 + label_w, r++, COL_WHITE, "%zu EUR", revenue);
@@ -565,22 +571,22 @@ render_dashboard(
     // --- 5. COLONNA DESTRA (CUCINA & TEMPI) ---
     r = 4;
     size_t c2 = mid_x + 3; // Margine sinistro colonna 2
-    
+
     s_draw_text(s, c2, r++, COL_WHITE, "\u25BA SITUAZIONE CUCINA");
     r++;
-    
+
     // DEFINIZIONE OFFSETS COLONNE (La soluzione al problema di allineamento)
     // Relative a c2
     int off_p = 0;  // Piatto
     int off_s = 14; // Serviti
     int off_r = 24; // Rimasti
-    
+
     // Header Tabella
     s_draw_text(s, c2 + off_p, r, COL_GRAY, "PIATTO");
     s_draw_text(s, c2 + off_s, r, COL_GRAY, "SERVITI");
     s_draw_text(s, c2 + off_r, r, COL_GRAY, "RIMASTI");
     r++;
-    
+
     // Linea sottile sotto header
     draw_hline(s, c2, r++, 32, COL_GRAY);
 
@@ -589,21 +595,21 @@ render_dashboard(
 
     it(i, 0, 3) {
         int t = types[i];
-        size_t srv = st[t].stats.served_dishes;
-        
+        size_t srv = st[i].stats.served_dishes; // FIX: st[t] in theory, but loop index matches
+
         // Colonna 1: Nome
         s_draw_text(s, c2 + off_p, r, COL_WHITE, "%s", labels[i]);
-        
+
         // Colonna 2: Serviti
-        s_draw_text(s, c2 + off_s, r, COL_WHITE, "%zu", srv);
-        
+        s_draw_text(s, c2 + off_s, r, COL_WHITE, "%zu", st[t].stats.served_dishes);
+
         // Colonna 3: Rimasti
         if (t == COFFEE_BAR) {
              s_draw_text(s, c2 + off_r, r, COL_WHITE, "\u221E"); // Simbolo Infinito
         } else {
             size_t leftovers = 0;
             it(k, 0, ctx->avl_dishes[t].size) leftovers += ctx->avl_dishes[t].data[k].quantity;
-            
+
             // Cambio colore se scarseggia il cibo (< 10 porzioni)
             uint8_t col = (leftovers < 10) ? COL_WHITE : COL_GRAY; // O rosso se lo implementi
             s_draw_text(s, c2 + off_r, r, col, "%zu", leftovers);
@@ -614,9 +620,9 @@ render_dashboard(
     r += 2;
     s_draw_text(s, c2, r++, COL_WHITE, "\u25BA EFFICIENZA STAZIONI");
     r++;
-    
+
     const char* st_names[] = {"Primi", "Main ", "Caffe", "Cassa"};
-    
+
     it(i, 0, NOF_STATIONS) {
         float avg = st[i].stats.served_dishes > 0 ?
             (float)st[i].stats.worked_time / st[i].stats.served_dishes : 0.0f;
@@ -630,7 +636,7 @@ render_dashboard(
 
         // Nome Stazione
         s_draw_text(s, c2, r, COL_GRAY, "%s:", st_names[i]);
-        
+
         // Tempo Medio (Allineato)
         s_draw_text(s, c2 + 7, r, COL_WHITE, "%4.0fns", avg);
 
@@ -638,35 +644,35 @@ render_dashboard(
 
         int bar_x = c2 + 22;
         s_draw_text(s, bar_x, r, COL_GRAY, "[");
-        
+
         for(int k=0; k < cap; k++) {
             if (wks[k].paused)
-                s_draw_text(s, bar_x + 1 + k, r, COL_GRAY, "_"); 
+                s_draw_text(s, bar_x + 1 + k, r, COL_GRAY, "_");
             else
-                s_draw_text(s, bar_x + 1 + k, r, COL_WHITE, "\u25A0"); 
-        }        
+                s_draw_text(s, bar_x + 1 + k, r, COL_WHITE, "\u25A0");
+        }
         s_draw_text(s, bar_x + 1 + cap, r, COL_GRAY, "]");
-        
+
         r++;
     }
 
-    
+
     // --- 6. FOOTER ---
 
     int footer_y = s->rows - 4;
 
     if (notification_timer > 0) {
         s_draw_text(s, 2, footer_y, COL_GREEN, "!!! ARRIVATI %d NUOVI CLIENTI !!!", saved_user_count);
-        
+
         notification_timer--;
     }
-    
+
     s_draw_text(s, 2, H - 2, COL_GRAY, "Premi [q] per terminare la simulazione.");
 
 
     int box_w = 22;
-    int box_x = mid_x + 2; 
-    int box_y = H - 2;     
+    int box_x = mid_x + 2;
+    int box_y = H - 2;
 
     s_draw_text(s, box_x, box_y, COL_GRAY, "SYS:[");
 
@@ -682,7 +688,7 @@ render_dashboard(
                 s_draw_text(s, box_x + 5 + i, box_y, COL_RED, "▁");
             }
         }
-        
+
         int blink_state = (min / 2) % 4;
         if (blink_state == 0 || blink_state == 2) {
             s_draw_text(s, box_x + box_w + 2, box_y, COL_RED, "!ALERT!");
@@ -703,11 +709,11 @@ render_dashboard(
     }
     s_draw_text(s, box_x + 21, box_y, COL_GRAY, "]");
 
-        
+
     s_display(s);
 }
 
-/* ========================== SUPPORT ========================== */ 
+/* ========================== SUPPORT ========================== */
 
 
 simctx_t*
@@ -722,7 +728,7 @@ init_ctx(
 
     ctx->config = conf;
     // load_config("data/config.json", &ctx->config);
- 
+
     it (i, 0, NOF_STATIONS)
         ctx->id_msg_q[i] = zmsgget(IPC_PRIVATE, IPC_CREAT | SHM_RW);
 
@@ -794,7 +800,7 @@ void
 write_shared_data(
     shmid_t ctx_shm,
     shmid_t st_shm
-) {    
+) {
     FILE *f = zfopen("data/shared", "w");
     fprintf(f, "%d, %d\n", (int)ctx_shm, (int)st_shm);
     fclose(f);
@@ -879,12 +885,12 @@ init_stations(
 void
 release_station(station st) {
     const worker_t *wks = get_workers(st.wk_data.shmid);
-    
+
     it(j, 0, st.wk_data.cap) {
         kill(wks[j].pid, SIGUSR1);
         msg_kill(wks[j].queue);
     }
-    
+
     shmdt(wks);
 
     shm_kill(st.wk_data.shmid);
@@ -911,7 +917,7 @@ kill_all_child(
             kill(wks[j].pid, SIGUSR1);
         }
     }
-    
+
     it(i, 0, ctx->config.nof_users) {
         kill(g_client_pids.id[i], SIGUSR1);
     }
@@ -941,12 +947,12 @@ assign_roles(
 
     if (total_srvc_time == 0) total_srvc_time = 1;
     int assigned_count = 0;
-    
+
     it(type, 0, NOF_STATIONS) {
         size_t weight = ctx->config.avg_srvc[type];
-        
+
         int extra_workers = (int)((weight * remaining) / total_srvc_time);
-        
+
         st[type].wk_data.cap += extra_workers;
         assigned_count       += extra_workers;
     }
@@ -956,10 +962,10 @@ assign_roles(
 
     while (leftovers > 0) {
         const loc_t target = g_priority_list[p_idx];
-        
+
         st[target].wk_data.cap++;
         leftovers--;
-        
+
         p_idx = (p_idx + 1) % NOF_STATIONS;
     }
 }

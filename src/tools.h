@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <sys/ipc.h>
 #include <time.h>
 #include <unistd.h>
@@ -278,6 +279,83 @@ zfsize(FILE* file) {
     fsize = ftell(file);
     fseek(file, 0, SEEK_SET);
     return fsize;
+}
+
+static inline void
+save_stats_csv(
+    const simctx_t *ctx,
+    const station  *stations,
+    const size_t    day
+) {
+    FILE *file = fopen("data/stats.csv", "a");
+    if (!file) {
+        if (DEBUG) perror("Impossibile aprire file CSV");
+        return;
+    }
+
+    const size_t users_served_day   = (size_t)sem_getval(ctx->sem[cl_end]);
+    const size_t users_unserved_day = (size_t)ctx->config.nof_users - users_served_day;
+
+    const size_t srv_primi   = stations[FIRST_COURSE].stats.served_dishes;
+    const size_t srv_secondi = stations[MAIN_COURSE].stats.served_dishes;
+    const size_t srv_caffe   = stations[COFFEE_BAR].stats.served_dishes;
+    const size_t srv_tot     = srv_primi + srv_secondi + srv_caffe;
+
+    size_t left_primi = 0;
+    it(k, 0, ctx->avl_dishes[FIRST_COURSE].size) {
+        left_primi += ctx->avl_dishes[FIRST_COURSE].data[k].quantity;
+    }
+
+    size_t left_secondi = 0;
+    it(k, 0, ctx->avl_dishes[MAIN_COURSE].size) {
+        left_secondi += ctx->avl_dishes[MAIN_COURSE].data[k].quantity;
+    }
+
+    const size_t earn_day = stations[CHECKOUT].stats.earnings;
+    size_t breaks_day = 0;
+    it(i, 0, NOF_STATIONS) breaks_day += stations[i].stats.total_breaks;
+
+    const size_t glob_unserved = ctx->global_stats.users_not_served;
+    const size_t glob_earn     = ctx->global_stats.earnings;
+
+    const size_t total_potential_users =(size_t) ctx->config.nof_users * (day + 1);
+    const size_t glob_served_users     = total_potential_users - glob_unserved;
+
+    const double avg_users_served = (double)glob_served_users / (day + 1);
+    const double avg_earn         = (double)glob_earn / (day + 1);
+
+    const long fsize = zfsize(file);
+    if (fsize == 0) {
+        fprintf(file,
+            "Giorno,"
+            "Utenti_Serviti_Day,Utenti_Non_Serviti_Day,"
+            "Utenti_Non_Serviti_Tot,Media_Utenti_Serviti_Day,"
+            "Piatti_Tot,Primi_Serviti,Secondi_Serviti,Caffe_Serviti,"
+            "Avanzi_Primi,Avanzi_Secondi,"
+            "Incasso_Day,Pause_Tot_Day,"
+            "Incasso_Tot,Media_Incasso_Day\n"
+        );
+    }
+
+    fprintf(file, "%zu,%zu,%zu,%zu,%.2f,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%.2f\n",
+            day + 1,
+            users_served_day,
+            users_unserved_day,
+            glob_unserved,
+            avg_users_served,
+            srv_tot,
+            srv_primi,
+            srv_secondi,
+            srv_caffe,
+            left_primi,
+            left_secondi,
+            earn_day,
+            breaks_day,
+            glob_earn,
+            avg_earn
+    );
+
+    fclose(file);
 }
 
 /* ======================= SUPPORT  ========================*/

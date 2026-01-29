@@ -5,9 +5,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <sys/ipc.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/msg.h>
@@ -171,7 +168,7 @@ sem_wait(const sem_t sem_id) {
     struct sembuf sb;
     sb.sem_num =  0;
     sb.sem_op  = -1;
-    sb.sem_flg =  0;
+    sb.sem_flg =  SEM_UNDO;
 
     if (semop(sem_id, &sb, 1) == -1) {
         if (errno == EINTR || errno == EIDRM || errno == EINVAL) {

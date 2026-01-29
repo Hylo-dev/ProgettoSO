@@ -135,12 +135,6 @@ clean:
 run-main: $(EXEC_MAIN)
 	@./$(EXEC_MAIN)
 
-run-worker: $(EXEC_WORKER)
-	@./$(EXEC_WORKER)
-
-run-client: $(EXEC_CLIENT)
-	@./$(EXEC_CLIENT)
-
 run-disorder: $(EXEC_DISORDER)
 	@./$(EXEC_DISORDER)
 

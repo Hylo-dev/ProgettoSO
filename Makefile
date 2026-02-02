@@ -133,7 +133,7 @@ clean:
 	@echo "$(TAG_CLEAN) Cleaned."
 
 run-main: $(EXEC_MAIN)
-	@./$(EXEC_MAIN)
+	@./$(EXEC_MAIN) $(ARGS)
 
 run-disorder: $(EXEC_DISORDER)
 	@./$(EXEC_DISORDER)

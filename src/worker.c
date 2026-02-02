@@ -136,10 +136,12 @@ work_with_pause(
         /* ================== SEM OWNERSHIP ================== */
         struct timespec t_start, t_end;
         clock_gettime(CLOCK_REALTIME, &t_start);
-        int res;
-        do {
-            res = sem_wait(st->wk_data.sem);
-        } while (res == -1 && errno == EINTR);
+
+        const int res = sem_wait(st->wk_data.sem);
+        if (res == -1 && errno == EINTR) {
+            continue;
+        }
+
         clock_gettime(CLOCK_REALTIME, &t_end);
         const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * TO_NANOSEC +
                              (t_end.tv_nsec - t_start.tv_nsec);

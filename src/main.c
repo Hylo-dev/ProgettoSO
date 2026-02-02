@@ -254,8 +254,6 @@ sim_day(
     zprintf(ctx->sem[out], "MAIN: Fine giornata\n");
 
     const int users_inside = sem_getval(ctx->sem[cl_end]);
-    zprintf(ctx->sem[out], "USER_END: %d\n", users_inside);
-    zprintf(ctx->sem[out], "Manual_quit: %d\n", *manual_quit);
     if (users_inside > 0)
         ctx->global_stats.users_not_served += users_inside;
 
@@ -395,16 +393,15 @@ kill_scr(screen* s) {
 
 void
 render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
-    int users_finished = sem_getval(ctx->sem[cl_end]);
-    int users_unserved = ctx->config.nof_users - users_finished;
-
-    int limit_users    = ctx->config.overload_threshold;
+    const int users_finished = sem_getval(ctx->sem[cl_end]);
+    const int users          = ctx->config.nof_users;
+    const int limit_users    = ctx->config.overload_threshold;
 
     // Logica di stato corretta
-    bool is_disorder = ctx->is_disorder_active;
+    const bool is_disorder = ctx->is_disorder_active;
     // Overload è vero solo se NON è manual quit e abbiamo superato il limite
-    bool is_overload = !manual_quit && (users_unserved >= limit_users);
-    bool is_failure  = is_overload || is_disorder;
+    const bool is_overload = !manual_quit && (users_finished >= limit_users);
+    const bool is_failure  = is_overload || is_disorder;
 
     int         status_col;
     const char *title_status;
@@ -422,7 +419,7 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
         if (is_disorder)
             snprintf(reason, sizeof(reason), "MOTIVO: Disordine in sala (Rissa/Caos scoppiato)");
         else
-            snprintf(reason, sizeof(reason), "MOTIVO: Overload (%d/%d utenti insoddisfatti)", users_unserved, limit_users);
+            snprintf(reason, sizeof(reason), "MOTIVO: Overload (%d/%d utenti insoddisfatti)", users_finished, users);
     } 
     // PRIORITA 3: Successo
     else {

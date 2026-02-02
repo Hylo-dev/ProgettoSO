@@ -372,13 +372,6 @@ _serve_food(
  */
 static inline void
 _serve_checkout(simctx_t *ctx, station *st, msg_t *response) {
-    /* If a global disorder is active, the checkout is broken */
-    if (ctx->is_disorder_active) {
-        zprintf(ctx->sem[out], "WORKER: Cash desk broken (Disorder active)!\n");
-        response->status = ERROR;
-        return;
-    }
-
     /* Verify access via the disorder semaphore to ensure synchronization during
      * chaos events */
     if (sem_wait(ctx->sem[disorder]) == -1) {

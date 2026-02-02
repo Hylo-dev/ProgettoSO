@@ -239,6 +239,7 @@ send_request(
                 it(i, 0, group->total_members - 1) { sem_signal(group->sem); }
                 group->members_ready = 0;
                 sem_signal(ctx->sem[shm]);
+
             } else {
                 /* Wait for the rest of the group. */
                 sem_signal(ctx->sem[shm]);
@@ -263,10 +264,11 @@ send_request(
 
                 if (response->status == RESPONSE_OK) {
                     payment_done = true;
+
                 } else if (response->status == ERROR) {
                     /* Retry after a short delay if checkout is busy or errored.
                      */
-                    znsleep(50);
+                    znsleep(50000000);
                 }
             }
             break;

@@ -137,10 +137,10 @@ work_with_pause(
         struct timespec t_start, t_end;
         clock_gettime(CLOCK_REALTIME, &t_start);
 
-        const int res = sem_wait(st->wk_data.sem);
-        if (res == -1 && errno == EINTR) {
-            continue;
-        }
+        int res;
+        do {
+            res = sem_wait(st->wk_data.sem);
+        } while (res == -1 && errno == EINTR);
 
         clock_gettime(CLOCK_REALTIME, &t_end);
         const long wait_ns = (t_end.tv_sec - t_start.tv_sec) * TO_NANOSEC +

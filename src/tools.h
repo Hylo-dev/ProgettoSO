@@ -319,6 +319,9 @@ save_stats_csv(
     size_t breaks_day = 0;
     it(i, 0, NOF_STATIONS) breaks_day += stations[i].stats.total_breaks;
 
+    const double avg_breaks_day = ctx->config.nof_workers > 0 ?
+        (double)breaks_day / ctx->config.nof_workers : 0.0;
+
     const size_t glob_unserved = ctx->global_stats.users_not_served;
     const size_t glob_earn     = ctx->global_stats.earnings;
 
@@ -336,12 +339,12 @@ save_stats_csv(
             "Utenti_Non_Serviti_Tot,Media_Utenti_Serviti_Day,"
             "Piatti_Tot,Primi_Serviti,Secondi_Serviti,Caffe_Serviti,"
             "Avanzi_Primi,Avanzi_Secondi,"
-            "Incasso_Day,Pause_Tot_Day,"
+            "Incasso_Day,Pause_Tot_Day,Media_Pause_Day,"
             "Incasso_Tot,Media_Incasso_Day\n"
         );
     }
 
-    fprintf(file, "%zu,%zu,%zu,%zu,%.2f,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%.2f\n",
+    fprintf(file, "%zu,%zu,%zu,%zu,%.2f,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%.2f,%zu,%.2f\n",
             day + 1,
             users_served_day,
             users_unserved_day,
@@ -355,6 +358,7 @@ save_stats_csv(
             left_secondi,
             earn_day,
             breaks_day,
+            avg_breaks_day,
             glob_earn,
             avg_earn
     );

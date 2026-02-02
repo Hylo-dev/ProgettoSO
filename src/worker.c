@@ -202,10 +202,11 @@ work_shift(
 
         if (self->nof_pause < (size_t)ctx->config.nof_pause) {
             if ((rand() % 100) < 15) { 
+                sem_wait(st->sem);
+
                 int free_seats = sem_getval(st->wk_data.sem);
                 int active_workers = (int)st->wk_data.cap - free_seats;
 
-                sem_wait(st->sem);
                 if (active_workers > 1) {
                     zprintf(
                         ctx->sem[out],

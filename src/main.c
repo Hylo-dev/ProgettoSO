@@ -355,11 +355,12 @@ init_client(
     const size_t  group_idx
 ) {
     const pid_t pid = zfork();
+    char *ticket_attr = (rand() % 100 < 80) ? "1" : "0";
 
     if (pid == 0) {
         char *args[] = {
             "client",
-            rand()%2 ? "1":"0",
+            ticket_attr,
             itos((int)ctx_id),
             itos((int)group_idx),
             NULL

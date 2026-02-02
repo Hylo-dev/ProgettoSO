@@ -366,17 +366,13 @@ int
 process_new_users(simctx_t *ctx) {
     sem_wait(ctx->sem[shm]);
     int num_new = ctx->added_users;
-    if (num_new > 0) {
-        ctx->added_users = 0;
-    }
+    ctx->added_users = 0;    
+    sem_signal(ctx->sem[shm]);
     
-    // Controllo di sicurezza per non sforare la memoria allocata
     if (ctx->config.nof_users + num_new > MAX_TOTAL_USERS) {
         zprintf(ctx->sem[out], "[ERROR] Max users limit reached in SHM!\n");
         return 0;
     }
-    
-    sem_signal(ctx->sem[shm]);
 
     if (num_new <= 0)
         return 0;

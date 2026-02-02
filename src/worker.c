@@ -314,7 +314,8 @@ _serve_checkout(
           size_t price    = response->price;
     const size_t discount = (price * DISCOUNT_DISH) / 100;
 
-    price -= discount;
+    if (response->ticket) price -= discount;
+
     sem_wait(st->sem);
     st->stats.earnings += price;
     sem_signal(st->sem);

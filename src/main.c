@@ -271,13 +271,11 @@ sim_day(
     }
 
     save_stats_csv(ctx, stations, day);
-
     it(i, 0, NOF_STATIONS) {
         memset(&stations[i].stats, 0, sizeof(stats));
     }
 
     ctx->is_day_running = false;
-
     if (*manual_quit || !ctx->is_sim_running) {
         // QUIT TO FINAL REPORT
         kill_all_child(ctx, stations, SIGTERM);
@@ -397,11 +395,10 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
     const int users          = ctx->config.nof_users;
     const int limit_users    = ctx->config.overload_threshold;
 
-    // Logica di stato corretta
     const bool is_disorder = ctx->is_disorder_active;
-    // Overload è vero solo se NON è manual quit e abbiamo superato il limite
     const bool is_overload = !manual_quit && (users_finished >= limit_users);
-    const bool is_failure  = is_overload || is_disorder;
+
+    const bool is_timeout  = !manual_quit && !is_overload && !is_disorder;
 
     int         status_col;
     const char *title_status;
@@ -410,22 +407,22 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
     if (manual_quit) {
         status_col = COL_GRAY;
         title_status = "SIMULAZIONE INTERROTTA";
-        snprintf(reason, sizeof(reason), "MOTIVO: Interruzione manuale dall'utente (Q / CTRL+C)");
-    }
-    // PRIORITA 2: Fallimento (Rissa o Overload naturale)
-    else if (is_failure) {
+        snprintf(reason, sizeof(reason), "MOTIVO: Interruzione manuale (Q / CTRL+C)");
+
+    } else if (is_disorder) {
         status_col = COL_RED;
-        title_status = "SIMULAZIONE TERMINATA: CRITICA";
-        if (is_disorder)
-            snprintf(reason, sizeof(reason), "MOTIVO: Disordine in sala (Rissa/Caos scoppiato)");
-        else
-            snprintf(reason, sizeof(reason), "MOTIVO: Overload (%d/%d utenti insoddisfatti)", users_finished, users);
-    } 
-    // PRIORITA 3: Successo
-    else {
+        title_status = "TERMINAZIONE: COM. DISORDER";
+        snprintf(reason, sizeof(reason), "MOTIVO: Blocco stazione cassa (Communication Disorder)");
+
+    } else if (is_overload) {
+        status_col = COL_RED;
+        title_status = "TERMINAZIONE: OVERLOAD";
+        snprintf(reason, sizeof(reason), "MOTIVO: Utenti in attesa (%d) > Soglia (%d)", users_finished, limit_users);
+
+    } else if (is_timeout) {
         status_col = COL_GREEN;
-        title_status = "SIMULAZIONE COMPLETATA";
-        snprintf(reason, sizeof(reason), "MOTIVO: Orario di chiusura raggiunto");
+        title_status = "TERMINAZIONE: TIMEOUT";
+        snprintf(reason, sizeof(reason), "MOTIVO: Raggiunta durata massima (%d giorni)", ctx->config.sim_duration);
     }
 
     
@@ -514,10 +511,12 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
         
         s_draw_text(s, 4, footer_y + 1, COL_WHITE, "Premi [q] per distruggere le risorse IPC e uscire.");
 
-        if (is_failure) {
+        if (is_disorder || is_overload || is_timeout) {
             s_draw_text(s, 4, footer_y + 2, COL_RED, "ATTENZIONE: Parametri critici superati.");
+
         } else if (manual_quit) {
             s_draw_text(s, 4, footer_y + 2, COL_GRAY, "NOTA: Simulazione parziale. I dati potrebbero essere incompleti.");
+
         } else {
              s_draw_text(s, 4, footer_y + 2, COL_GREEN, "Ottimo lavoro! Simulazione conclusa con successo.");
         }

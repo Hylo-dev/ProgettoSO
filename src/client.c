@@ -180,17 +180,7 @@ send_request(
                     return;
                 }
 
-                send_msg(self->msgq, msg, sizeof(msg_t)-sizeof(long));
-                recive_msg(self->msgq, self->pid, response);
-                break;
-
-            case TABLE:
-                zprintf(
-                    ctx->sem[out],
-                    "CLIENT: %d, %d, WAITING TABLE\n",
-                    self->pid, self->loc
-                );
-
+                // ======================== GROUP WAITING ==========================
                 sem_wait(ctx->sem[shm]);
                 group->members_ready++;
 
@@ -199,11 +189,30 @@ send_request(
                         sem_signal(group->sem);
                     }
                     sem_signal(ctx->sem[shm]);
-
                 } else {
                     sem_signal(ctx->sem[shm]);
                     sem_signal(group->sem);
                 }
+
+                bool payment_done = false;
+                while (!payment_done && ctx->is_sim_running) {
+                    send_msg(self->msgq, msg, sizeof(msg_t) - sizeof(long));
+                    recive_msg(self->msgq, self->pid, response);
+
+                    if (response->status == RESPONSE_OK) {
+                        payment_done = true;
+                    } else if (response->status == ERROR) {
+                        znsleep(50);
+                    }
+                }
+                break;
+
+            case TABLE:
+                zprintf(
+                    ctx->sem[out],
+                    "CLIENT: %d, %d, WAITING TABLE\n",
+                    self->pid, self->loc
+                );
 
                 sem_wait(ctx->sem[tbl]);
 

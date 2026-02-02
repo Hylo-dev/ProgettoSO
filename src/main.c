@@ -250,10 +250,12 @@ sim_day(
 
     zprintf(ctx->sem[out], "MAIN: Fine giornata\n");
 
-    const int users_inside = ctx->config.nof_users - sem_getval(ctx->sem[cl_end]);
-    if (users_inside > 0) {
+    const int users_inside = sem_getval(ctx->sem[cl_end]);
+    zprintf(ctx->sem[out], "USER_END: %d\n", users_inside);
+    zprintf(ctx->sem[out], "Manual_quit: %d\n", *manual_quit);
+    if (users_inside > 0)
         ctx->global_stats.users_not_served += users_inside;
-    }
+
 
     if (!(*manual_quit) && users_inside >= ctx->config.overload_threshold) {
         zprintf(ctx->sem[out], "MAIN: Sim end overload (Users left: %d)\n", users_inside);
@@ -275,7 +277,7 @@ sim_day(
 
     ctx->is_day_running = false;
 
-    if (*manual_quit) {
+    if (*manual_quit || !ctx->is_sim_running) {
         // QUIT TO FINAL REPORT
         kill_all_child(ctx, stations, SIGTERM);
     } else {
@@ -390,7 +392,9 @@ kill_scr(screen* s) {
 
 void
 render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
-    int users_unserved = ctx->global_stats.users_not_served;
+    int users_finished = sem_getval(ctx->sem[cl_end]);
+    int users_unserved = ctx->config.nof_users - users_finished;
+
     int limit_users    = ctx->config.overload_threshold;
 
     // Logica di stato corretta

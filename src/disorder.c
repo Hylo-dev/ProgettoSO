@@ -1,7 +1,3 @@
-//
-// Created by Eliomar Alejandro Rodriguez Ferrer on 26/01/26.
-//
-
 #include "tools.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -38,7 +34,6 @@ read_shm_id(int *ctx_id, int *shm_st) {
         panic("ERROR: Context not exist!\n");
     }
 
-    // printf("Test, read value: %d, %d\n", *ctx_id, *shm_st);
     fclose(file);
 }
 

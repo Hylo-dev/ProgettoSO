@@ -1,7 +1,3 @@
-//
-// Created by Eliomar Alejandro Rodriguez Ferrer on 08/01/26.
-//
-
 #ifndef _MENU_H
 #define _MENU_H
 

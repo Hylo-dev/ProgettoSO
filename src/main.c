@@ -268,6 +268,11 @@ sim_day(
         ctx->global_stats.earnings      += stations[i].stats.earnings;
         ctx->global_stats.total_breaks  += stations[i].stats.total_breaks;
         ctx->global_stats.worked_time   += stations[i].stats.worked_time;
+
+        stations[i].total_stats.served_dishes += stations[i].stats.served_dishes;
+        stations[i].total_stats.earnings      += stations[i].stats.earnings;
+        stations[i].total_stats.total_breaks  += stations[i].stats.total_breaks;
+        stations[i].total_stats.worked_time   += stations[i].stats.worked_time;
     }
 
     save_stats_csv(ctx, stations, day);
@@ -392,13 +397,37 @@ kill_scr(screen* s) {
 void
 render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
     const int users_finished = sem_getval(ctx->sem[cl_end]);
-    const int users          = ctx->config.nof_users;
     const int limit_users    = ctx->config.overload_threshold;
 
     const bool is_disorder = ctx->is_disorder_active;
     const bool is_overload = !manual_quit && (users_finished >= limit_users);
-
     const bool is_timeout  = !manual_quit && !is_overload && !is_disorder;
+
+    // --- CALCOLO DATI (Logica estratta da tools.h -> save_stats_csv) ---
+    
+    // 1. Avanzi (Snapshot finale della memoria)
+    size_t left_primi = 0;
+    it(k, 0, ctx->avl_dishes[FIRST_COURSE].size) {
+        left_primi += ctx->avl_dishes[FIRST_COURSE].data[k].quantity;
+    }
+
+    size_t left_secondi = 0;
+    it(k, 0, ctx->avl_dishes[MAIN_COURSE].size) {
+        left_secondi += ctx->avl_dishes[MAIN_COURSE].data[k].quantity;
+    }
+
+    // 2. Totali per categoria (Dalle statistiche accumulate delle stazioni)
+    const size_t tot_primi   = st[FIRST_COURSE].total_stats.served_dishes;
+    const size_t tot_secondi = st[MAIN_COURSE].total_stats.served_dishes;
+    const size_t tot_caffe   = st[COFFEE_BAR].total_stats.served_dishes;
+    const size_t tot_dishes  = ctx->global_stats.served_dishes;
+
+    // 3. Economia e Staff Globale
+    const size_t tot_earn    = ctx->global_stats.earnings;
+    const size_t tot_breaks  = ctx->global_stats.total_breaks;
+    const size_t tot_unserved= ctx->global_stats.users_not_served;
+
+    // --- SETUP TUI ---
 
     int         status_col;
     const char *title_status;
@@ -408,24 +437,20 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
         status_col = COL_GRAY;
         title_status = "SIMULAZIONE INTERROTTA";
         snprintf(reason, sizeof(reason), "MOTIVO: Interruzione manuale (Q / CTRL+C)");
-
     } else if (is_disorder) {
         status_col = COL_RED;
         title_status = "TERMINAZIONE: COM. DISORDER";
         snprintf(reason, sizeof(reason), "MOTIVO: Blocco stazione cassa (Communication Disorder)");
-
     } else if (is_overload) {
         status_col = COL_RED;
         title_status = "TERMINAZIONE: OVERLOAD";
         snprintf(reason, sizeof(reason), "MOTIVO: Utenti in attesa (%d) > Soglia (%d)", users_finished, limit_users);
-
     } else if (is_timeout) {
         status_col = COL_GREEN;
         title_status = "TERMINAZIONE: TIMEOUT";
         snprintf(reason, sizeof(reason), "MOTIVO: Raggiunta durata massima (%d giorni)", ctx->config.sim_duration);
     }
 
-    
     while (true) {
         s_clear(s);
         const int W = s->cols;
@@ -434,99 +459,111 @@ render_final_report(screen *s, simctx_t *ctx, station *st, bool manual_quit) {
 
         // --- HEADER ---
         draw_box(s, 0, 0, W, H, COL_WHITE);
-        
-        // Box colorato per lo stato
-        draw_box(s, 1, 1, W - 2, 5, status_col); 
+        draw_box(s, 1, 1, W - 2, 5, status_col);
 
-        // Titolo centrato
         size_t title_len = strlen(title_status);
         size_t reason_len = strlen(reason);
-        
-        // Se abortito manualmente, usiamo COL_WHITE per il testo, altrimenti lo stesso del box
         s_draw_text(s, (W - title_len) / 2, 2, COL_WHITE, "%s", title_status);
         s_draw_text(s, (W - reason_len) / 2, 3, COL_WHITE, "%s", reason);
 
-        // --- COLONNA SINISTRA: GLOBAL STATS ---
         int r = 8;
         int c1 = 4;
-        int val_x = c1 + 24; 
+        int val_x = c1 + 24;
 
-        s_draw_text(s, c1, r++, COL_WHITE, "\u25BA RISULTATI GLOBALI");
+        s_draw_text(s, c1, r++, COL_WHITE, "\u25BA STATISTICHE GLOBALI");
         draw_hline(s, c1, r++, 35, COL_GRAY);
 
-        float avg_earnings = ctx->global_stats.served_dishes > 0 ?
-            (float)ctx->global_stats.earnings / ctx->global_stats.served_dishes : 0.0f;
-
         s_draw_text(s, c1, r, COL_GRAY, "Incasso Totale:");
-        s_draw_text(s, val_x, r++, COL_GREEN, "%zu€", ctx->global_stats.earnings);
+        s_draw_text(s, val_x, r++, COL_GREEN, "%zu €", tot_earn);
 
-        s_draw_text(s, c1, r, COL_GRAY, "Piatti Serviti:");
-        s_draw_text(s, val_x, r++, COL_WHITE, "%zu", ctx->global_stats.served_dishes);
+        s_draw_text(s, c1, r, COL_GRAY, "Pause Staff Totali:");
+        s_draw_text(s, val_x, r++, COL_WHITE, "%zu", tot_breaks);
 
-        s_draw_text(s, c1, r, COL_GRAY, "Utenti Non Serviti:");
-        // Se è fallito per overload è Rosso, altrimenti Bianco
-        uint8_t uns_col = is_overload ? COL_RED : COL_WHITE;
-        s_draw_text(s, val_x, r++, uns_col, "%zu", ctx->global_stats.users_not_served);
+        r++; // Spaziatore
 
-        s_draw_text(s, c1, r, COL_GRAY, "Incasso Medio/Piatto:");
-        s_draw_text(s, val_x, r++, COL_WHITE, "%.2f€", avg_earnings);
+        s_draw_text(s, c1, r, COL_GRAY, "Utenti Non Serviti Tot:");
+        uint8_t uns_col = (tot_unserved > 0) ? COL_RED : COL_WHITE;
+        s_draw_text(s, val_x, r++, uns_col, "%zu", tot_unserved);
 
-        s_draw_text(s, c1, r, COL_GRAY, "Pause Totali Staff:");
-        s_draw_text(s, val_x, r++, COL_WHITE, "%zu", ctx->global_stats.total_breaks);
+        s_draw_text(s, c1, r, COL_GRAY, "Piatti Serviti Tot:");
+        s_draw_text(s, val_x, r++, COL_WHITE, "%zu", tot_dishes);
 
-        // --- COLONNA DESTRA: DETTAGLIO STAZIONI ---
+        float avg_ticket = (tot_dishes > 0) ? (float)tot_earn / tot_dishes : 0.0f;
+        s_draw_text(s, c1, r, COL_GRAY, "Media EUR/Piatto:");
+        s_draw_text(s, val_x, r++, COL_WHITE, "%.2f", avg_ticket);
+
+
+        // --- COLONNA DESTRA: DETTAGLIO CUCINA ---
         int c2 = mid_x + 2;
         r = 8;
 
-        s_draw_text(s, c2, r++, COL_WHITE, "\u25BA DETTAGLIO REPARTI");
+        s_draw_text(s, c2, r++, COL_WHITE, "\u25BA DETTAGLIO PORTATE & RIMANENZE");
         draw_hline(s, c2, r++, W - c2 - 4, COL_GRAY);
 
-        int off_n = 0; int off_s = 10; int off_e = 20; int off_f = 32;
+        // Intestazioni Tabella
+        int off_cat = 0; 
+        int off_srv = 14; 
+        int off_rem = 26;
 
-        s_draw_text(s, c2 + off_n, r, COL_GRAY, "REP.");
-        s_draw_text(s, c2 + off_s, r, COL_GRAY, "SRV");
-        s_draw_text(s, c2 + off_e, r, COL_GRAY, "RICAVO");
-        s_draw_text(s, c2 + off_f, r, COL_GRAY, "EFFICIENZA");
+        s_draw_text(s, c2 + off_cat, r, COL_GRAY, "CATEGORIA");
+        s_draw_text(s, c2 + off_srv, r, COL_GRAY, "SERVITI");
+        s_draw_text(s, c2 + off_rem, r, COL_GRAY, "AVANZI");
         r++;
         draw_hline(s, c2, r++, W - c2 - 4, COL_GRAY);
 
-        const char* names[] = {"Primi", "Secnd", "Caffe", "Cassa"};
+        // Riga Primi
+        s_draw_text(s, c2 + off_cat, r, COL_WHITE, "Primi");
+        s_draw_text(s, c2 + off_srv, r, COL_WHITE, "%zu", tot_primi);
+        s_draw_text(s, c2 + off_rem, r, COL_WHITE, "%zu", left_primi);
+        r++;
 
-        it(i, 0, NOF_STATIONS) {
-            size_t srv = st[i].stats.served_dishes;
-            size_t ear = st[i].stats.earnings;
-            size_t time = st[i].stats.worked_time;
-            float efficiency = (srv > 0) ? (float)time / srv : 0.0f;
+        // Riga Secondi
+        s_draw_text(s, c2 + off_cat, r, COL_WHITE, "Secondi");
+        s_draw_text(s, c2 + off_srv, r, COL_WHITE, "%zu", tot_secondi);
+        s_draw_text(s, c2 + off_rem, r, COL_WHITE, "%zu", left_secondi);
+        r++;
 
-            s_draw_text(s, c2 + off_n, r, COL_WHITE, "%s", names[i]);
-            s_draw_text(s, c2 + off_s, r, COL_WHITE, "%3zu", srv);
-            s_draw_text(s, c2 + off_e, r, COL_GREEN, "%5zu€", ear);
-            s_draw_text(s, c2 + off_f, r, COL_GRAY,  "%5.0f ns/u", efficiency);
-            r++;
-        }
+        // Riga Caffè
+        s_draw_text(s, c2 + off_cat, r, COL_WHITE, "Caffe");
+        s_draw_text(s, c2 + off_srv, r, COL_WHITE, "%zu", tot_caffe);
+        s_draw_text(s, c2 + off_rem, r, COL_GRAY, "\u221E"); 
+        r++;
 
         // --- FOOTER ---
         int footer_y = H - 4;
         draw_hline(s, 1, footer_y, W - 2, COL_GRAY);
-        
-        s_draw_text(s, 4, footer_y + 1, COL_WHITE, "Premi [q] per distruggere le risorse IPC e uscire.");
 
-        if (is_disorder || is_overload || is_timeout) {
-            s_draw_text(s, 4, footer_y + 2, COL_RED, "ATTENZIONE: Parametri critici superati.");
+        s_draw_text(
+            s, 4, footer_y + 1, COL_WHITE,
+            "Premi [q] per distruggere le risorse IPC e uscire."
+        );
+
+        if (is_disorder || is_overload) {
+            s_draw_text(
+                s, 4, footer_y + 2, COL_RED,
+                "ATTENZIONE: Parametri critici superati."
+            );
 
         } else if (manual_quit) {
-            s_draw_text(s, 4, footer_y + 2, COL_GRAY, "NOTA: Simulazione parziale. I dati potrebbero essere incompleti.");
-
+            s_draw_text(
+                s, 4, footer_y + 2, COL_GRAY,
+                "NOTA: Simulazione parziale. I dati potrebbero essere "
+                "incompleti."
+            );
         } else {
-             s_draw_text(s, 4, footer_y + 2, COL_GREEN, "Ottimo lavoro! Simulazione conclusa con successo.");
+            s_draw_text(
+                s, 4, footer_y + 2, COL_GREEN,
+                "Simulazione conclusa con successo."
+            );
         }
 
         s_display(s);
 
         char c = s_getch();
-        if (c == 'q' || g_stop_req) break;
+        if (c == 'q' || g_stop_req)
+            break;
 
-        usleep(100000); 
+        usleep(100000);
     }
 }
 

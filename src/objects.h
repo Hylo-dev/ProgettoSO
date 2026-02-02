@@ -94,6 +94,7 @@ typedef struct {
     // usato per aggiungere i worker e per le statistiche
     sem_t sem;
     stats stats;
+    stats total_stats;
     loc_t type;
 
     struct {

@@ -166,19 +166,6 @@ send_request(
                 break;
 
             case CHECKOUT:
-                if (collected == 0) {
-                    zprintf(ctx->sem[out], "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
-
-                    sem_wait(ctx->sem[shm]);
-                    group->total_members--;
-
-                    if (group->members_ready >= group->total_members && group->total_members > 0) {
-                        sem_set(group->sem, (int)group->total_members - 1);
-                    }
-
-                    sem_signal(ctx->sem[shm]);
-                    return;
-                }
 
                 // ======================== GROUP WAITING ==========================
                 sem_wait(ctx->sem[shm]);
@@ -188,12 +175,19 @@ send_request(
                     it(i, 0, group->total_members - 1) {
                         sem_signal(group->sem);
                     }
+                    group->members_ready = 0;
                     sem_signal(ctx->sem[shm]);
                 } else {
                     sem_signal(ctx->sem[shm]);
                     sem_wait(group->sem);
                 }
+                
+                if (collected == 0) {
+                    zprintf(ctx->sem[out], "CLIENT %d: Digiuno (tutto finito o rinuncia), esco.\n", self->pid);
+                    return;
+                }
 
+                // ======================== GROUP WAITING ENDED ==========================
                 bool payment_done = false;
                 while (!payment_done && ctx->is_sim_running) {
                     send_msg(self->msgq, msg, sizeof(msg_t) - sizeof(long));

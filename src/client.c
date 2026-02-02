@@ -257,20 +257,8 @@ send_request(
             }
 
             /* ====================== PAYMENT PROCESS ======================== */
-            bool payment_done = false;
-            while (!payment_done && ctx->is_sim_running) {
-                send_msg(self->msgq, msg, sizeof(msg_t) - sizeof(long));
-                recive_msg(self->msgq, self->pid, response);
-
-                if (response->status == RESPONSE_OK) {
-                    payment_done = true;
-
-                } else if (response->status == ERROR) {
-                    /* Retry after a short delay if checkout is busy or errored.
-                     */
-                    znsleep(50000000);
-                }
-            }
+            send_msg(self->msgq, msg, sizeof(msg_t) - sizeof(long));
+            recive_msg(self->msgq, self->pid, response);
             break;
 
         case TABLE:

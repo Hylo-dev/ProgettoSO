@@ -174,8 +174,8 @@ typedef struct {
     bool is_day_running;
 
     bool   is_disorder_active;
-    size_t added_users; // TODO implement this shit
-
+    size_t added_users;
+    
     struct groups_t {
         size_t id;
         size_t total_members;

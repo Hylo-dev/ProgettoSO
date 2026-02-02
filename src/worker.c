@@ -316,7 +316,7 @@ _serve_food(
         const dish_t dish_info = ctx->menu[self->role].data[actual_index];
 
         if (*quantity_p > 0) {
-            /* Decrement stock (COFFEE_BAR is treated as having infinite supply)
+            /* Decrement stock (COFFEE_BAR is treated as having infinite supply, what a dream)
              */
             if (self->role != COFFEE_BAR) {
                 *quantity_p -= 1;

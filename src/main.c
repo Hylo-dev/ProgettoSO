@@ -130,7 +130,7 @@ main(int argc, char **argv) {
 
     /* Memory Allocation & Context Setup */
     const size_t ctx_shm =
-        zshmget(sizeof(simctx_t) + (conf.nof_users * sizeof(struct groups_t)));
+        zshmget(sizeof(simctx_t) + (MAX_TOTAL_USERS * sizeof(struct groups_t)));
     simctx_t *ctx = init_ctx(ctx_shm, conf);
 
     const size_t st_shm   = zshmget(sizeof(station) * NOF_STATIONS);
@@ -369,6 +369,13 @@ process_new_users(simctx_t *ctx) {
     if (num_new > 0) {
         ctx->added_users = 0;
     }
+    
+    // Controllo di sicurezza per non sforare la memoria allocata
+    if (ctx->config.nof_users + num_new > MAX_TOTAL_USERS) {
+        zprintf(ctx->sem[out], "[ERROR] Max users limit reached in SHM!\n");
+        return 0;
+    }
+    
     sem_signal(ctx->sem[shm]);
 
     if (num_new <= 0)
@@ -382,8 +389,17 @@ process_new_users(simctx_t *ctx) {
     size_t new_total = old_count + num_new;
     pid_t *new_ptr   = zrealloc(g_client_pids.id, new_total * sizeof(pid_t));
     g_client_pids.id = new_ptr;
+    
+    it(i, 0, num_new) {
+        size_t new_idx = old_count + i;
+        
+        ctx->groups[new_idx].id = new_idx;
+        ctx->groups[new_idx].total_members = 1;
+        ctx->groups[new_idx].members_ready = 0;
+        ctx->groups[new_idx].sem = sem_init(0);
 
-    it(i, 0, num_new) init_client(g_shmid, old_count + i);
+        init_client(g_shmid, new_idx);
+    }
 
     sem_wait(ctx->sem[shm]);
     ctx->config.nof_users += num_new;

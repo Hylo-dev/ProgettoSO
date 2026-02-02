@@ -5,6 +5,7 @@
 #define NOF_STATIONS 4
 #define MAX_DISHES 3
 #define DISCOUNT_DISH 12
+#define MAX_TOTAL_USERS 1000
 
 /* =================== DISH MAX =================== */
 #define MAX_MAIN 10

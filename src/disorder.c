@@ -12,6 +12,7 @@ static simctx_t *g_ctx = NULL;
 
 static inline void
 cleanup_and_exit(int sig) {
+    (void)sig;
     if (g_ctx && g_sem_disorder != -1) {
 
         if (g_ctx->is_disorder_active) {

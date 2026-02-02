@@ -191,7 +191,7 @@ send_request(
                     sem_signal(ctx->sem[shm]);
                 } else {
                     sem_signal(ctx->sem[shm]);
-                    sem_signal(group->sem);
+                    sem_wait(group->sem);
                 }
 
                 bool payment_done = false;

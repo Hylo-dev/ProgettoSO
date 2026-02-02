@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/msg.h>
@@ -276,6 +277,12 @@ zfsize(FILE* file) {
     fsize = ftell(file);
     fseek(file, 0, SEEK_SET);
     return fsize;
+}
+
+static void
+fclear(const char* filename) {
+    FILE *fp = zfopen(filename, "w");
+    fclose(fp);
 }
 
 static inline void

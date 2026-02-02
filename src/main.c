@@ -116,6 +116,9 @@ main(int argc, char **argv) {
         return -1;
     }
 
+    fclear("data/simulation.log");
+    fclear("data/stats.csv");
+
     /* ========================== INIT ========================== */
     signal(SIGUSR1, SIG_IGN);
     srand((unsigned int)time(NULL));

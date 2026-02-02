@@ -45,6 +45,10 @@ main(
     const int    argc,
           char** argv
 ) {
+    /* ====================== CTRL+C HANDLE ==================== */
+    signal(SIGINT, SIG_IGN);
+    /* ========================================================= */
+    
     // argv must be:
     /* {
      *    exec name,

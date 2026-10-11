@@ -196,7 +196,7 @@ init_screen(size_t rows, size_t cols) {
     s->rows   = rows;
     s->cols   = cols;
     s->len    = rows * cols;
-    s->cells = (Cell *)zmalloc(s->len * sizeof(Cell));
+    s->cells  = (Cell *)zmalloc(s->len * sizeof(Cell));
 
     s_clear(s);
     return s;
